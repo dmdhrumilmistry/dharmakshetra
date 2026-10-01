@@ -1,0 +1,90 @@
+# Dharmakshetra
+
+A board game of realms and trade set in the world of the Mahabharata. Travel from Hastinapura to Dwaraka, claim kingdoms, raise temples and palaces, draw Krishna's Leela and the Ashirvad of the elders, and outlast your rivals on the field of dharma.
+
+Everything runs in the browser. There is no server and no build step: host it on GitHub Pages (or any static host) and play.
+
+## Ways to play
+
+- **On this device**: one browser, any mix of people taking turns (hot seat) and computer players.
+- **Online with friends**: one player hosts, shares a room code or invite link, and everyone else joins from their own browser. Up to 6 players, with computer players filling empty seats if you like.
+
+## The characters
+
+Each player takes on a character with one divine power, usable once per game before rolling.
+
+| Character | Power | Effect |
+|---|---|---|
+| Krishna | Sudarshana | Choose your dice total (2 to 12) |
+| Balarama | Halayudha | Your next temple is free |
+| Arjuna | Gandiva | The next rent you owe is waived |
+| Bhima | Vayu's speed | Your next roll moves double |
+| Draupadi | Akshaya Patra | Collect 200 at once |
+| Karna | Kavacha | Your next tax or card payment is waived |
+| Bhishma | Iccha Mrityu | Leave Vanavas now, or ignore the next sentence to it |
+| Hanuman | Great leap | Leap to the next Tirtha before you roll |
+
+## The board
+
+- 22 realms in 8 colour groups, from the forest villages of Ekachakra and Varanavata to the divine cities of Indraprastha and Dwaraka.
+- 4 Tirthas (river crossings) and 2 divine treasures (Akshaya Patra and Kamadhenu).
+- Corners: Hastinapura (collect 200 when passing), Vanavas (exile), Kurukshetra (rest) and the Dyuta Sabha (the rigged dice game that sends you into exile).
+- Hold a full colour group to double its rent and build temples evenly; four temples become a palace.
+- Unwanted landings go to auction. Players can trade realms, gold and pardon cards at any time.
+
+The full rules are in the game under "How to play".
+
+## How the networking works
+
+- Multiplayer uses **WebRTC data channels**, so game traffic flows directly between browsers.
+- To find each other, browsers exchange connection offers through the free public [PeerJS](https://peerjs.com/) broker. No game data is stored there.
+- NAT traversal uses **Google's public STUN servers** (`stun.l.google.com:19302` and `stun1` to `stun4`).
+- The host's browser is the authority: it runs the rules, the computer players, and sends the game state to everyone. Guests send only their moves, and the host checks each move belongs to the sender.
+- Connections are kept alive with heartbeats. A guest who refreshes or drops reconnects automatically to the same seat. If a guest is gone for good, the host can hand their seat to the computer.
+- The host's game is saved in the browser, so a host who closes the tab can resume from the start screen and reopen the same room code.
+
+STUN covers most home networks. Some strict corporate or mobile carrier networks block direct peer connections; in that case add a TURN server to `ICE_SERVERS` in `js/net.js`.
+
+## Run locally
+
+Any static file server works, for example:
+
+```sh
+npm start            # serves on http://localhost:8080
+```
+
+ES modules do not load from `file://`, so open the game through a server rather than double-clicking `index.html`.
+
+## Tests
+
+The rules engine is pure JavaScript with no DOM access. The test plays hundreds of complete all-computer games and checks that no game stalls and the state stays valid (no negative gold, no orphaned holdings, no buildings on pledged land).
+
+```sh
+npm test
+```
+
+## Deploy to GitHub Pages
+
+1. Push this repository to GitHub.
+2. In the repository, open **Settings > Pages**.
+3. Under **Build and deployment**, choose **Deploy from a branch**, select `main` and `/ (root)`, then save.
+
+The site appears at `https://<user>.github.io/dharmakshetra/`. Invite links use the page's own address, so they work from wherever you host it.
+
+Note: GitHub Pages for a private repository requires a paid GitHub plan (Pro, Team or Enterprise). On a free plan, make the repository public or host the folder on another static host.
+
+## Project layout
+
+```
+index.html        page shell and screens
+css/style.css     visual design
+js/data.js        board, cards and characters
+js/engine.js      game rules (pure, host-side)
+js/bot.js         computer players
+js/net.js         WebRTC networking (PeerJS + Google STUN)
+js/ui.js          rendering
+js/art.js         hand-built SVG art
+js/sound.js       synthesised sounds
+js/main.js        app controller
+tests/            engine simulation test
+```

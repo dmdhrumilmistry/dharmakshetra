@@ -1,0 +1,11 @@
+{
+  "name": "dharmakshetra",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A Mahabharata-themed realm trading board game. Pure frontend, peer-to-peer over WebRTC.",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/sim.test.js",
+    "start": "npx --yes http-server -c-1 -p 8080 ."
+  }
+}
