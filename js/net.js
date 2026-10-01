@@ -1,25 +1,14 @@
-// Peer-to-peer networking over WebRTC data channels.
+﻿// Peer-to-peer networking over WebRTC data channels.
 // PeerJS's free public broker is used only to exchange connection offers;
 // all game traffic flows directly between browsers. NAT traversal uses
-// Google's public STUN servers. Add a TURN server to ICE_SERVERS if players
-// sit behind strict corporate or mobile carrier NATs.
+// Google's public STUN servers plus any TURN servers set in Connection settings.
+
+import { rtcConfig } from './settings.js';
 
 const PEER_SRC = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
-const PREFIX = 'dharmakshetra-v1-';
+export const PREFIX = 'dharmakshetra-v1-';
 
-export const ICE_SERVERS = [
-  {
-    urls: [
-      'stun:stun.l.google.com:19302',
-      'stun:stun1.l.google.com:19302',
-      'stun:stun2.l.google.com:19302',
-      'stun:stun3.l.google.com:19302',
-      'stun:stun4.l.google.com:19302',
-    ],
-  },
-];
-
-const PEER_OPTS = { config: { iceServers: ICE_SERVERS }, debug: 1 };
+const peerOpts = () => ({ config: rtcConfig(), debug: 1 });
 const PING_MS = 4000;
 const DEAD_MS = 14000;
 
@@ -84,8 +73,9 @@ export class HostNet {
   }
 
   _open() {
-    const peer = new window.Peer(PREFIX + this.code, PEER_OPTS);
+    const peer = new window.Peer(PREFIX + this.code, peerOpts());
     this.peer = peer;
+    if (this.h.onPeer) this.h.onPeer(peer);
     peer.on('open', () => { this.retries = 0; this.h.onReady(); });
     peer.on('connection', (conn) => this._accept(conn));
     peer.on('disconnected', () => {
@@ -105,6 +95,11 @@ export class HostNet {
       }
       if (err.type === 'peer-unavailable') return; // a guest vanished mid-handshake
       this.h.onError(describe(err), err.type === 'browser-incompatible');
+      // Could not register with the broker at all (network blip): try again.
+      if (!peer.open && !this.closed && ['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
+        peer.destroy();
+        setTimeout(() => { if (!this.closed) this._open(); }, 3000);
+      }
     });
   }
 
@@ -160,6 +155,7 @@ export class HostNet {
   }
 
   close() {
+    this.closed = true;
     clearInterval(this.timer);
     for (const e of this.conns.values()) try { e.conn.close(); } catch { /* ignore */ }
     this.conns.clear();
@@ -190,12 +186,17 @@ export class GuestNet {
 
   _ensurePeer() {
     if (this.peer && !this.peer.destroyed) {
-      if (this.peer.disconnected) this.peer.reconnect();
-      else if (this.peer.open) this._connect();
-      return;
+      // A peer that never received an id from the broker cannot recover; start over.
+      if (!this.peer.id) this.peer.destroy();
+      else {
+        if (this.peer.disconnected) this.peer.reconnect();
+        else if (this.peer.open) this._connect();
+        return;
+      }
     }
-    const peer = new window.Peer(PEER_OPTS);
+    const peer = new window.Peer(peerOpts());
     this.peer = peer;
+    if (this.h.onPeer) this.h.onPeer(peer);
     peer.on('open', () => this._connect());
     peer.on('disconnected', () => {
       if (!peer.destroyed && !this.closed) setTimeout(() => !peer.destroyed && peer.reconnect(), 1500);

@@ -7,7 +7,17 @@ Everything runs in the browser. There is no server and no build step: host it on
 ## Ways to play
 
 - **On this device**: one browser, any mix of people taking turns (hot seat) and computer players.
-- **Online with friends**: one player hosts, shares a room code or invite link, and everyone else joins from their own browser. Up to 6 players, with computer players filling empty seats if you like.
+- **Online with friends**: one player hosts, shares a room code or invite link, and everyone else joins from their own browser. Up to 6 players, with computer players filling empty seats if you like. Text chat and **voice chat** are built in.
+
+It is designed for every screen: a two-column table on desktops, a stacked layout on tablets, and on phones a player strip, a full-width board and a thumb-friendly control dock (with a side-by-side layout in landscape). Menus and deeds open as bottom sheets on phones.
+
+## Made to feel like a game
+
+- **Comic characters**: each character is drawn as an expressive comic portrait that blinks, bobs and reacts: happy when claiming land, sad when paying rent, shocked when sent into exile.
+- **Comic panels**: rent, exile, full sets, cards, trades and victories pop up as comic panels with speech bubbles in each character's voice and bold sound-effect bursts.
+- **Motion**: tokens hop tile by tile, the Sudarshana chakra spins as the dice tumble, gold floats up from players as it changes hands, owner seals stamp onto claimed land, temples rise, and lotus petals fall when someone completes a set or wins.
+- **Stories**: tap any tile to see a pencil-and-wash sketch of the place drawn in front of you, and read the story from the epic of why it matters.
+- Synthesised sounds and, on phones, light haptic feedback.
 
 ## The characters
 
@@ -43,7 +53,21 @@ The full rules are in the game under "How to play".
 - Connections are kept alive with heartbeats. A guest who refreshes or drops reconnects automatically to the same seat. If a guest is gone for good, the host can hand their seat to the computer.
 - The host's game is saved in the browser, so a host who closes the tab can resume from the start screen and reopen the same room code.
 
-STUN covers most home networks. Some strict corporate or mobile carrier networks block direct peer connections; in that case add a TURN server to `ICE_SERVERS` in `js/net.js`.
+STUN covers most home networks. Some strict corporate or mobile carrier networks block direct peer connections; for those, add a **TURN server** in the game under **Connection settings** (on the start screen, or in the in-game menu):
+
+- Enter one or more TURN servers (address, username, password). They are stored only in your browser.
+- **Test connection** shows whether your network can reach Google STUN and your TURN relay.
+- **Always relay through TURN** forces traffic through the relay, which also hides your IP address from other players.
+- A host can choose to **include the TURN settings in the invite link**. They travel in the link's `#fragment`, which browsers never send to any server, and are used by guests for that session only. Share such links only with people you trust.
+
+TURN servers are offered by providers such as Metered and Cloudflare, or you can run your own with coturn.
+
+### Voice chat
+
+- Voice uses WebRTC audio calls over the same peer connections setup (PeerJS, Google STUN and any TURN servers you add).
+- Players can join voice from the lobby or during the game. Everyone in voice connects directly to everyone else (a small mesh, fine for up to 6 players).
+- Mute and leave buttons sit in the top bar; a green glow shows who is speaking, and a mic badge shows who is in voice.
+- Voice needs microphone permission and a secure page (https), which GitHub Pages provides.
 
 ## Run locally
 
@@ -82,9 +106,15 @@ js/data.js        board, cards and characters
 js/engine.js      game rules (pure, host-side)
 js/bot.js         computer players
 js/net.js         WebRTC networking (PeerJS + Google STUN)
+js/settings.js    TURN settings, invite sharing, connection test
+js/voice.js       voice chat mesh
+js/characters.js  comic character portraits and their lines
+js/comic.js       comic panels, banners, floating gold, confetti
+js/places.js      stories and sketch scenes for every place
+js/sketch.js      pencil-and-wash sketch renderer
 js/ui.js          rendering
-js/art.js         hand-built SVG art
+js/art.js         board art, emblems and icons
 js/sound.js       synthesised sounds
 js/main.js        app controller
-tests/            engine simulation test
+tests/            engine simulation test, plus portrait and sketch preview sheets
 ```

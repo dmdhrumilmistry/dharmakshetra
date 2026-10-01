@@ -1,4 +1,4 @@
-﻿// Hand-drawn SVG art: character emblems, tile icons and the board centrepiece.
+// Hand-drawn SVG art: character emblems, tile icons and the board centrepiece.
 // Palette follows Pichwai temple paintings: night indigo, gold leaf, lotus pink.
 
 const IVORY = '#FBF3E0';
@@ -224,4 +224,25 @@ export function centreArt() {
       <circle cx="16" cy="60" r="4" fill="#E86A8E"/>
     </g>
   </svg>`;
+}
+
+// Interface icons (stroke, currentColor).
+const UI_ICON = {
+  mic: '<rect x="24" y="8" width="16" height="30" rx="8"/><path d="M16 30 C 16 42, 24 48, 32 48 C 40 48, 48 42, 48 30 M32 48 V56 M24 56 H40"/>',
+  micOff: '<rect x="24" y="8" width="16" height="30" rx="8"/><path d="M16 30 C 16 42, 24 48, 32 48 C 40 48, 48 42, 48 30 M32 48 V56 M24 56 H40 M10 10 L54 54"/>',
+  headset: '<path d="M12 40 V32 C 12 20, 21 10, 32 10 C 43 10, 52 20, 52 32 V40"/><rect x="8" y="36" width="10" height="16" rx="4"/><rect x="46" y="36" width="10" height="16" rx="4"/><path d="M52 50 C 52 56, 44 58, 36 58"/>',
+  hangup: '<path d="M8 36 C 18 26, 46 26, 56 36 L 52 44 L 42 40 L 40 34 C 36 32, 28 32, 24 34 L 22 40 L 12 44 Z"/>',
+  speaker: '<path d="M10 24 H20 L34 12 V52 L20 40 H10 Z M42 22 C 48 28, 48 36, 42 42 M48 16 C 58 26, 58 38, 48 48"/>',
+  speakerOff: '<path d="M10 24 H20 L34 12 V52 L20 40 H10 Z M42 24 L56 40 M56 24 L42 40"/>',
+  menu: '<path d="M12 18 H52 M12 32 H52 M12 46 H52"/>',
+  scroll: '<path d="M18 10 H46 C 50 10, 52 14, 52 18 V54 H22 C 18 54, 14 50, 14 46 V14 C 14 12, 16 10, 18 10 Z M22 22 H44 M22 30 H44 M22 38 H36"/>',
+  swap: '<path d="M14 22 H50 L40 12 M50 42 H14 L24 52"/>',
+  chat: '<path d="M10 14 H54 V44 H28 L16 54 V44 H10 Z M20 26 H44 M20 34 H36"/>',
+  realm: '<path d="M14 56 V8 M14 10 H46 L38 20 L46 30 H14"/>',
+  gear: '<circle cx="32" cy="32" r="8"/><path d="M32 6 V14 M32 50 V58 M6 32 H14 M50 32 H58 M13.6 13.6 L19.3 19.3 M44.7 44.7 L50.4 50.4 M13.6 50.4 L19.3 44.7 M44.7 19.3 L50.4 13.6"/>',
+  users: '<circle cx="24" cy="22" r="8"/><path d="M8 52 C 8 40, 16 34, 24 34 C 32 34, 40 40, 40 52"/><circle cx="44" cy="20" r="6"/><path d="M42 32 C 50 32, 56 38, 56 48"/>',
+  close: '<path d="M16 16 L48 48 M48 16 L16 48"/>',
+};
+export function uiIcon(name, cls = 'uic') {
+  return `<svg class="${cls}" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UI_ICON[name] || ''}</svg>`;
 }

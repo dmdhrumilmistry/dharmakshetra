@@ -37,7 +37,7 @@ export function newGame(seats, rng = Math.random) {
       leela: shuffle(LEELA.map((_, i) => i), rng),
       ashirvad: shuffle(ASHIRVAD.map((_, i) => i), rng),
     },
-    event: null, eventId: 0, log: [], logId: 0, winner: null,
+    event: null, eventId: 0, fx: [], fxSeq: 0, log: [], logId: 0, winner: null,
   };
   log(s, `The game of Dharmakshetra begins. ${players[0].name} rolls first.`);
   return s;
@@ -140,6 +140,17 @@ function log(s, msg) {
 
 function event(s, data) {
   s.event = { id: ++s.eventId, ...data };
+  fx(s, data);
+}
+
+// Visual effects queue for clients; cleared at the start of every action.
+function fx(s, data) {
+  (s.fx ||= []).push(data);
+}
+
+function checkSet(s, owner, i) {
+  const t = TILES[i];
+  if (t.type === 'realm' && ownsGroup(s, owner, t.group)) fx(s, { kind: 'set', player: owner, group: t.group });
 }
 
 function pay(s, fromId, toId, amount, reason, { bank = false } = {}) {
@@ -148,14 +159,17 @@ function pay(s, fromId, toId, amount, reason, { bank = false } = {}) {
   if (bank && p.flags.shield) {
     delete p.flags.shield;
     log(s, `${p.name}'s Kavacha turns away a payment of ${amount}.`);
+    fx(s, { kind: 'shield', player: p.id });
     return;
   }
   if (p.cash >= amount) {
     p.cash -= amount;
     if (toId) player(s, toId).cash += amount;
+    fx(s, { kind: reason.startsWith('rent') ? 'rent' : bank ? 'tax' : 'pay', player: fromId, to: toId, amount, reason });
     log(s, `${p.name} pays ${amount}${toId ? ` to ${player(s, toId).name}` : ''} for ${reason}.`);
   } else {
     s.debts.push({ debtor: fromId, creditor: toId, amount, reason });
+    fx(s, { kind: 'debt', player: fromId, to: toId, amount, reason });
     log(s, `${p.name} owes ${amount} for ${reason} and must raise funds.`);
   }
 }
@@ -164,6 +178,7 @@ function moveTo(s, p, target, { dice = 0, mult = 1, salary = true } = {}) {
   const from = p.pos;
   if (salary && target < from) {
     p.cash += GO_SALARY;
+    fx(s, { kind: 'go', player: p.id });
     log(s, `${p.name} passes Hastinapura and collects ${GO_SALARY}.`);
   }
   p.pos = target;
@@ -183,6 +198,7 @@ function sendToJail(s, p) {
   if (p.flags.exileImmune) {
     delete p.flags.exileImmune;
     log(s, `${p.name} invokes Iccha Mrityu and refuses the sentence of exile.`);
+    fx(s, { kind: 'shield', player: p.id });
     return;
   }
   const from = p.pos;
@@ -192,6 +208,7 @@ function sendToJail(s, p) {
   s.lastMove = { id: ++s.moveId, player: p.id, from, to: JAIL_POS, steps: 0, direct: true };
   if (s.players[s.cur].id === p.id) s.turn.doubles = 0;
   log(s, `${p.name} is sent into exile at Vanavas.`);
+  fx(s, { kind: 'jail', player: p.id });
 }
 
 function land(s, p, dice, mult = 1) {
@@ -206,6 +223,7 @@ function land(s, p, dice, mult = 1) {
       if (p.flags.freeRent) {
         delete p.flags.freeRent;
         log(s, `${p.name} draws Gandiva and pays no rent at ${t.name}.`);
+        fx(s, { kind: 'shield', player: p.id });
       } else {
         pay(s, p.id, o.owner, rent, `rent at ${t.name}`);
       }
@@ -276,6 +294,7 @@ function roll(s, p, rng, forced) {
     if (doubles) {
       p.jail = false;
       log(s, `Doubles. ${p.name} walks free from Vanavas.`);
+      fx(s, { kind: 'free', player: p.id });
       return moveBy(s, p, total, total);
     }
     p.jailTurns++;
@@ -289,6 +308,7 @@ function roll(s, p, rng, forced) {
 
   if (doubles) {
     s.turn.doubles++;
+    if (s.turn.doubles < 3) fx(s, { kind: 'doubles', player: p.id });
     if (s.turn.doubles >= 3) {
       log(s, `Three doubles in a row. Shakuni cries foul.`);
       sendToJail(s, p);
@@ -323,6 +343,8 @@ function settleAuction(s) {
     p.cash -= a.high;
     s.own[a.tile] = { owner: p.id, houses: 0, mort: false };
     log(s, `${p.name} wins ${TILES[a.tile].name} at auction for ${a.high}.`);
+    fx(s, { kind: 'auction', player: p.id, tile: a.tile, amount: a.high });
+    checkSet(s, p.id, a.tile);
     s.auction = null;
   } else if (a.order.length === 0) {
     log(s, `No one bids. ${TILES[a.tile].name} stays with the crown.`);
@@ -372,6 +394,7 @@ function bankrupt(s, p, creditorId) {
       settleAuction(s);
     }
   }
+  fx(s, { kind: 'fall', player: p.id });
   log(s, `${p.name} has fallen and leaves the field${creditor ? `. Their lands pass to ${creditor.name}` : ''}.`);
 
   const left = alive(s);
@@ -401,6 +424,7 @@ function nextTurn(s) {
   }
   s.cur = k;
   s.turn = { rolled: false, doubles: 0 };
+  fx(s, { kind: 'turn', player: current(s).id });
   log(s, `${current(s).name}'s turn.`);
 }
 
@@ -422,6 +446,8 @@ export function apply(state, action, rng = Math.random) {
   if (!action || !action.type) return { error: 'Unknown action.' };
   if (state.status !== 'playing' && action.type !== 'END_GAME') return { error: 'The game is over.' };
   const s = clone(state);
+  s.fx = [];
+  s.fxSeq = (state.fxSeq || 0) + 1;
 
   // Host-only actions do not need a living seat.
   if (action.type === 'END_GAME' || action.type === 'REPLACE_WITH_BOT') {
@@ -518,6 +544,7 @@ export function apply(state, action, rng = Math.random) {
       s.own[s.buy.tile] = { owner: p.id, houses: 0, mort: false };
       log(s, `${p.name} claims ${t.name} for ${t.price}.`);
       event(s, { kind: 'buy', player: p.id, tile: s.buy.tile });
+      checkSet(s, p.id, s.buy.tile);
       s.buy = null;
       break;
     }
@@ -559,6 +586,7 @@ export function apply(state, action, rng = Math.random) {
       if (!free && p.cash < cost) return err('Not enough gold.');
       if (free) delete p.flags.freeTemple; else p.cash -= cost;
       s.own[i].houses++;
+      fx(s, { kind: 'build', player: p.id, tile: i, palace: s.own[i].houses === 5 });
       log(s, `${p.name} raises a ${s.own[i].houses === 5 ? 'palace' : 'temple'} in ${TILES[i].name}${free ? ' with Balarama\'s plough' : ''}.`);
       break;
     }
@@ -638,7 +666,9 @@ export function apply(state, action, rng = Math.random) {
       b.jailCards.push(...a.jailCards.splice(0, t.give.cards));
       a.jailCards.push(...b.jailCards.splice(0, t.get.cards));
       log(s, `${b.name} accepts the trade with ${a.name}.`);
-      event(s, { kind: 'trade', from: a.id, to: b.id });
+      event(s, { kind: 'trade', player: b.id, from: a.id, to: b.id });
+      for (const i of t.give.tiles) checkSet(s, b.id, i);
+      for (const i of t.get.tiles) checkSet(s, a.id, i);
       s.trade = null;
       break;
     }

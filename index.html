@@ -4,12 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Dharmakshetra - a game of realms</title>
-  <meta name="description" content="Trade realms, raise temples and outlast your rivals in a board game set in the world of the Mahabharata. Play solo against sages or with friends, peer to peer.">
+  <meta name="description" content="Trade realms, raise temples and outlast your rivals in a board game set in the world of the Mahabharata. Play solo against the computer or with friends, peer to peer, with voice chat.">
   <meta name="theme-color" content="#17224A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Yatra+One&family=Mukta:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Yatra+One&family=Mukta:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -31,8 +33,8 @@
           <div class="field">
             <span>Your character</span>
             <div id="home-chars" class="char-grid" role="radiogroup" aria-label="Choose your character"></div>
-            <p id="home-char-power" class="power-note"></p>
           </div>
+          <div id="home-hero"></div>
 
           <div class="home-actions">
             <button id="btn-local" class="btn primary">Play on this device</button>
@@ -42,8 +44,11 @@
             <input id="join-code" maxlength="8" placeholder="Room code" aria-label="Room code" autocomplete="off" spellcheck="false">
             <button class="btn">Join game</button>
           </form>
-          <button id="btn-resume" class="link" hidden>Resume your saved game</button>
-          <button id="btn-rules" class="link">How to play</button>
+          <div class="home-links">
+            <button id="btn-resume" class="link" hidden>Resume your saved game</button>
+            <button id="btn-rules" class="link">How to play</button>
+            <button class="link" data-act="settings">Connection settings</button>
+          </div>
         </div>
       </div>
     </section>
@@ -58,8 +63,10 @@
             <span>Room code</span>
             <strong id="lobby-code"></strong>
             <button id="lobby-copy" class="btn small">Copy invite link</button>
+            <button id="lobby-share" class="btn small" hidden>Share</button>
           </div>
           <p id="lobby-status" class="status-line"></p>
+          <div class="voice-slot" data-voice-slot hidden></div>
         </header>
         <ul id="lobby-seats" class="seats"></ul>
         <div class="lobby-actions">
@@ -81,12 +88,14 @@
         <span id="top-room" class="top-room"></span>
         <span id="net-status" class="net-status" hidden></span>
         <nav class="top-actions">
-          <button id="btn-trade" class="btn small">Trade</button>
-          <button id="btn-sound" class="btn small" aria-pressed="true">Sound on</button>
-          <button id="btn-menu" class="btn small">Menu</button>
+          <div class="voice-slot" data-voice-slot hidden></div>
+          <button id="btn-trade" class="btn small wide-only">Trade</button>
+          <button id="btn-sound" class="btn small icon-btn" aria-pressed="true" aria-label="Sound"></button>
+          <button id="btn-menu" class="btn small icon-btn" aria-label="Menu"></button>
         </nav>
       </header>
       <main class="table">
+        <div id="pstrip" class="pstrip" aria-label="Players"></div>
         <div class="board-wrap">
           <div id="board" class="board"></div>
         </div>
@@ -105,7 +114,18 @@
             <form id="game-chat" class="chat-form" hidden><input maxlength="200" placeholder="Message everyone" aria-label="Chat message"><button class="btn small">Send</button></form>
           </section>
         </aside>
+        <ul id="feed" class="feed" aria-live="polite" aria-label="Latest events"></ul>
+        <div id="dock" class="dock">
+          <div id="dock-ui" class="dock-ui"></div>
+          <nav class="dock-nav">
+            <button data-act="sheet" data-sheet="realms"><span data-ico="realm"></span>Realms</button>
+            <button data-act="sheet" data-sheet="trade"><span data-ico="swap"></span>Trade</button>
+            <button data-act="sheet" data-sheet="log"><span data-ico="scroll"></span>Chronicle</button>
+            <button data-act="sheet" data-sheet="chat" class="online-only"><span data-ico="chat"></span>Chat<i class="badge" id="chat-badge" hidden></i></button>
+          </nav>
+        </div>
       </main>
+      <div id="comic" class="comic-layer"></div>
     </section>
   </div>
 

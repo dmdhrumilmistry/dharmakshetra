@@ -1,0 +1,10 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Sketch sheet</title>
+<style>body{background:#22306A;margin:0;padding:12px;font-family:sans-serif;color:#fff;display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+figure{margin:0}figure svg{width:100%;display:block;border-radius:6px}figcaption{font-size:12px}</style></head>
+<body>
+<script type="module">
+import { sketch } from '../js/sketch.js';
+import { TILES } from '../js/data.js';
+document.body.innerHTML = TILES.map((t, i) => `<figure>${sketch(i)}<figcaption>${i} ${t.name}</figcaption></figure>`).join('');
+</script></body></html>

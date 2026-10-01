@@ -1,0 +1,11 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Portrait sheet</title>
+<style>body{background:#22306A;margin:0;padding:16px;font-family:sans-serif;color:#fff}
+.row{display:flex;gap:10px;margin-bottom:10px;align-items:center}.row svg{width:140px;height:140px;background:#FBF3E0;border-radius:12px}
+.heads svg{width:56px;height:56px;background:#2F55B4;border-radius:50%}</style></head>
+<body><div id="out"></div>
+<script type="module">
+import { portrait } from '../js/characters.js';
+const ids = ['krishna','balarama','arjuna','bhima','draupadi','karna','bhishma','hanuman'];
+out.innerHTML = ids.map(id => `<div class="row"><b style="width:80px">${id}</b>${['idle','happy','sad','shock'].map(m => portrait(id, m)).join('')}<span class="heads">${portrait(id,'idle',{headOnly:true})}</span></div>`).join('');
+</script></body></html>
