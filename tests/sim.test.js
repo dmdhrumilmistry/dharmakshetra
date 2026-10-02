@@ -67,3 +67,23 @@ for (let g = 0; g < 300; g++) {
   total += r.round;
 }
 console.log(`ok: 300 games, average ${Math.round(total / 300)} rounds`);
+
+// Counter offers: A offers 100 gold for B's realm, B counters asking 250, A accepts.
+{
+  const assert = (ok, msg) => { if (!ok) throw new Error('trade test: ' + msg); };
+  let s = newGame([{ id: 'a', name: 'A', char: 'krishna' }, { id: 'b', name: 'B', char: 'arjuna' }], rng);
+  s.own[1] = { owner: 'b', houses: 0, mort: false };
+  const step = (a) => { const r = apply(s, a, rng); if (r.error) throw new Error('trade test: ' + r.error); s = r.state; return s; };
+  step({ type: 'PROPOSE_TRADE', by: 'a', to: 'b', give: { cash: 100, tiles: [] }, get: { cash: 0, tiles: [1] } });
+  assert(s.fx.some((f) => f.kind === 'trade-offer'), 'offer effect');
+  assert(apply(s, { type: 'COUNTER_TRADE', by: 'a', give: {}, get: {} }).error, 'proposer cannot counter own offer');
+  step({ type: 'COUNTER_TRADE', by: 'b', give: { cash: 0, tiles: [1] }, get: { cash: 250, tiles: [] } });
+  assert(s.trade.from === 'b' && s.trade.to === 'a' && s.trade.round === 2, 'counter flips sides');
+  assert(s.fx.some((f) => f.kind === 'trade-counter'), 'counter effect');
+  step({ type: 'ACCEPT_TRADE', by: 'a' });
+  assert(s.own[1].owner === 'a' && s.players[0].cash === 1250 && s.players[1].cash === 1750, 'counter terms applied');
+  step({ type: 'PROPOSE_TRADE', by: 'b', to: 'a', give: { cash: 10 }, get: { tiles: [1] } });
+  step({ type: 'REJECT_TRADE', by: 'a' });
+  assert(!s.trade && s.fx.some((f) => f.kind === 'trade-reject' && f.to === 'b'), 'decline reported to proposer');
+  console.log('ok: counter offers');
+}

@@ -1002,7 +1002,9 @@ function handleEffects(s) {
     else if (f.kind === 'rent' || f.kind === 'tax') { play('coin'); if (controls(f.player)) buzz([20, 40, 20]); }
     else if (f.kind === 'jail') { play('card'); buzz(60); }
     else if (f.kind === 'card') play('card');
-    else if (f.kind === 'power' || f.kind === 'set' || f.kind === 'trade') play('chime');
+    else if (f.kind === 'power' || f.kind === 'set' || f.kind === 'trade' || f.kind === 'trade-counter') play('chime');
+    else if (f.kind === 'trade-reject' || f.kind === 'trade-fail') play('card');
+    if (f.kind === 'trade' || f.kind.startsWith('trade-')) tradeNotice(f);
     else if (f.kind === 'turn' && controls(f.player)) buzz(15);
     else if (f.kind === 'win') {
       play('win');
@@ -1015,7 +1017,54 @@ function handleTrade(s) {
   if (s.trade && controls(s.trade.to) && app.ui.seenTrade !== s.trade.id) {
     app.ui.seenTrade = s.trade.id;
     play('chime');
-    openModal(UI.tradeReviewHTML(s), 'trade-review', s.trade.id, { sticky: true });
+    openModal(UI.tradeReviewHTML(s, s.trade.to), 'trade-review', s.trade.id, { sticky: true });
+  }
+}
+
+function openTradeView() {
+  const s = app.state;
+  if (!s.trade) return;
+  const viewer = controls(s.trade.to) ? s.trade.to : s.trade.from;
+  openModal(UI.tradeReviewHTML(s, viewer), 'trade-review', s.trade.id, { sticky: viewer === s.trade.to });
+}
+
+function openCounter() {
+  const t = app.state.trade;
+  if (!t || !controls(t.to)) return;
+  const copy = (x) => ({ cash: x.cash || 0, tiles: [...x.tiles], cards: x.cards || 0 });
+  // From the counterer's side: they give what was asked of them, and ask for what was offered.
+  app.ui.draft = { from: t.to, to: t.from, give: copy(t.get), get: copy(t.give), counter: true, tradeId: t.id };
+  renderTradeModal();
+}
+
+// Tell both sides of a trade how it went.
+function tradeNotice(f) {
+  const s = app.state;
+  const name = (id) => (player(s, id) || {}).name || 'Someone';
+  const mineFrom = controls(f.to), mineBy = controls(f.player);
+  switch (f.kind) {
+    case 'trade-offer':
+      if (mineBy) toast(`Offer sent to ${name(f.to)}. Waiting for an answer.`);
+      break;
+    case 'trade-counter':
+      if (mineBy) toast(`Counter offer sent to ${name(f.to)}.`);
+      else if (mineFrom) toast(`${name(f.player)} sent you a counter offer.`);
+      break;
+    case 'trade-reject':
+      if (mineFrom) { toast(`${name(f.player)} declined your offer.`, true); buzz([30, 40, 30]); }
+      else if (mineBy) toast(`You declined ${name(f.to)}'s offer.`);
+      break;
+    case 'trade-cancel':
+      if (mineFrom) toast(`${name(f.player)} withdrew their offer.`);
+      else if (mineBy) toast('Offer withdrawn.');
+      break;
+    case 'trade-fail':
+      if (mineFrom || mineBy) toast(`The trade fell through: ${f.reason}`, true);
+      break;
+    case 'trade':
+      if (controls(f.from)) { toast(`${name(f.to)} accepted your offer. Deal done!`); buzz(40); }
+      else if (controls(f.to)) toast(`Deal done with ${name(f.from)}.`);
+      break;
   }
 }
 
@@ -1034,7 +1083,9 @@ function refreshModal(s, c) {
     }
   } else if (m.kind === 'trade-review' && (!s.trade || s.trade.id !== m.arg)) closeModal();
   else if (m.kind === 'trade' && app.ui.draft) {
-    if (s.trade || !player(s, app.ui.draft.from) || player(s, app.ui.draft.from).bankrupt) closeModal();
+    const d = app.ui.draft;
+    const gone = !player(s, d.from) || player(s, d.from).bankrupt;
+    if (gone || (d.counter ? !s.trade || s.trade.id !== d.tradeId : !!s.trade)) closeModal();
   } else if (m.kind === 'player') modalBox.innerHTML = UI.playerHTML(s, m.arg, c);
   else if (m.kind === 'sheet-realms') modalBox.querySelector('.realms').innerHTML = UI.realmsHTML(s, c.focus);
   else if (m.kind === 'sheet-log') modalBox.querySelector('.log').innerHTML = UI.logHTML(s, app.chat);
@@ -1189,12 +1240,15 @@ document.addEventListener('click', async (e) => {
     case 'propose': {
       const d = app.ui.draft;
       closeModal();
-      send('PROPOSE_TRADE', d.from, { to: d.to, give: d.give, get: d.get });
+      if (d.counter) send('COUNTER_TRADE', d.from, { give: d.give, get: d.get });
+      else send('PROPOSE_TRADE', d.from, { to: d.to, give: d.give, get: d.get });
       break;
     }
     case 'accept-trade': closeModal(); send('ACCEPT_TRADE', by); break;
     case 'reject-trade': closeModal(); send('REJECT_TRADE', by); break;
-    case 'cancel-trade': send('CANCEL_TRADE', by); break;
+    case 'cancel-trade': if (app.ui.modal?.kind === 'trade-review') closeModal(); send('CANCEL_TRADE', by); break;
+    case 'counter-trade': openCounter(); break;
+    case 'trade-view': openTradeView(); break;
     case 'replace-bot': closeModal(); hostApply({ type: 'REPLACE_WITH_BOT', host: true, target: b.dataset.target }); break;
     case 'results': openModal(UI.resultsHTML(app.state), 'results'); break;
     case 'home': goHome(); break;

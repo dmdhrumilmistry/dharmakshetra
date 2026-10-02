@@ -63,9 +63,26 @@ export class Comic {
         case 'debt': panel({ burst: 'In debt!', kind: 'jail', cast: [[c, 'shock', 'I need to raise gold!']], text: `${p.name} owes ${f.amount}` }); break;
         case 'trade': {
           const a = who(f.from);
-          panel({ burst: 'Deal!', kind: 'buy', ms: 1700, cast: [[a.char, 'happy', 'A fair exchange.'], [c, 'happy', 'Agreed!']] });
+          panel({ burst: 'Deal!', kind: 'buy', ms: 1900, cast: [[a.char, 'happy', 'A fair exchange.'], [c, 'happy', 'Agreed!']], text: `${p.name} accepts ${a.name}'s offer` });
           break;
         }
+        case 'trade-offer': {
+          const t = who(f.to);
+          panel({ burst: 'Offer!', kind: 'mini', ms: 1400, cast: [[c, 'happy', `${t.name}, I have a proposal.`]] });
+          break;
+        }
+        case 'trade-counter': {
+          const t = who(f.to);
+          panel({ burst: 'Counter!', kind: 'power', ms: 1900, cast: [[c, 'happy', 'How about this instead?'], [t.char, 'shock', 'Hmm...']], text: `${p.name} counters ${t.name}'s offer` });
+          break;
+        }
+        case 'trade-reject': {
+          const t = who(f.to);
+          panel({ burst: 'Declined!', kind: 'jail', ms: 1800, cast: [[c, 'idle', 'Not this time.'], [t.char, 'sad', 'Perhaps another day.']], text: `${p.name} declines ${t.name}'s offer` });
+          break;
+        }
+        case 'trade-cancel': panel({ burst: 'Withdrawn', kind: 'mini', ms: 1200, cast: [[c, 'idle', 'I take my offer back.']] }); break;
+        case 'trade-fail': panel({ burst: 'No deal!', kind: 'jail', ms: 1800, cast: [[c, 'shock', 'It fell through!']], text: f.reason }); break;
         case 'fall': panel({ burst: 'Fallen!', kind: 'jail', ms: 2400, cast: [[c, 'sad', line(c, 'fall')]], text: `${p.name} leaves the field` }); break;
         case 'win': panel({ burst: 'Victory!', kind: 'win', ms: 3200, cast: [[c, 'happy', line(c, 'win')]], text: `${p.name} wins the game`, confetti: 90 }); break;
       }

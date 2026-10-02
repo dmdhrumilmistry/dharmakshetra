@@ -640,24 +640,44 @@ export function apply(state, action, rng = Math.random) {
       nextTurn(s);
       break;
     }
-    case 'PROPOSE_TRADE': {
-      if (s.trade) return err('Another trade is already on the table.');
-      const to = player(s, action.to);
+    case 'PROPOSE_TRADE':
+    case 'COUNTER_TRADE': {
+      const countering = action.type === 'COUNTER_TRADE';
+      let to;
+      if (countering) {
+        if (!s.trade || s.trade.to !== p.id) return err('There is no offer to counter.');
+        to = player(s, s.trade.from);
+      } else {
+        if (s.trade) return err('Another trade is already on the table.');
+        to = player(s, action.to);
+      }
       if (!to || to.bankrupt || to.id === p.id) return err('Choose another player.');
       const e = validateSide(s, p.id, action.give) || validateSide(s, to.id, action.get);
       if (e) return err(e);
-      const norm = (x) => ({ cash: Math.floor(Number(x.cash) || 0), tiles: (x.tiles || []).slice(), cards: Math.floor(Number(x.cards) || 0) });
+      const norm = (x) => ({ cash: Math.floor(Number(x.cash) || 0), tiles: [...new Set((x.tiles || []).map(Number))], cards: Math.floor(Number(x.cards) || 0) });
       const give = norm(action.give), get = norm(action.get);
       if (!give.cash && !give.tiles.length && !give.cards && !get.cash && !get.tiles.length && !get.cards) return err('The offer is empty.');
-      s.trade = { id: s.logId + 1, from: p.id, to: to.id, give, get };
-      log(s, `${p.name} offers a trade to ${to.name}.`);
+      const round = countering ? (s.trade.round || 1) + 1 : 1;
+      s.trade = { id: (s.tradeSeq = (s.tradeSeq || 0) + 1), from: p.id, to: to.id, give, get, round };
+      if (countering) {
+        log(s, `${p.name} rejects the offer and counters with one of their own.`);
+        fx(s, { kind: 'trade-counter', player: p.id, to: to.id });
+      } else {
+        log(s, `${p.name} offers a trade to ${to.name}.`);
+        fx(s, { kind: 'trade-offer', player: p.id, to: to.id });
+      }
       break;
     }
     case 'ACCEPT_TRADE': {
       const t = s.trade;
       if (!t || t.to !== p.id) return err('No trade awaits you.');
       const e = validateSide(s, t.from, t.give) || validateSide(s, t.to, t.get);
-      if (e) { s.trade = null; log(s, `The trade falls through. ${e}`); break; }
+      if (e) {
+        s.trade = null;
+        log(s, `The trade falls through. ${e}`);
+        fx(s, { kind: 'trade-fail', player: t.to, to: t.from, reason: e });
+        break;
+      }
       const a = player(s, t.from), b = player(s, t.to);
       a.cash += t.get.cash - t.give.cash;
       b.cash += t.give.cash - t.get.cash;
@@ -674,13 +694,15 @@ export function apply(state, action, rng = Math.random) {
     }
     case 'REJECT_TRADE': {
       if (!s.trade || s.trade.to !== p.id) return err('No trade awaits you.');
-      log(s, `${p.name} declines the trade.`);
+      log(s, `${p.name} declines ${player(s, s.trade.from).name}'s offer.`);
+      fx(s, { kind: 'trade-reject', player: p.id, to: s.trade.from });
       s.trade = null;
       break;
     }
     case 'CANCEL_TRADE': {
       if (!s.trade || s.trade.from !== p.id) return err('You have no open offer.');
       log(s, `${p.name} withdraws the trade offer.`);
+      fx(s, { kind: 'trade-cancel', player: p.id, to: s.trade.to });
       s.trade = null;
       break;
     }

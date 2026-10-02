@@ -6,7 +6,7 @@ import {
   canBuild, canSell, canMortgage, unmortgageCost,
 } from './engine.js';
 import { medallion, tileIcon, icon, coin, chakra, centreArt, uiIcon } from './art.js';
-import { portrait } from './characters.js';
+import { portrait, portraitSrc } from './characters.js';
 import { PLACES } from './places.js';
 import { sketch } from './sketch.js';
 
@@ -250,15 +250,32 @@ function turnView(s, ctx) {
   return { who, title, prompt, acts, mood };
 }
 
+// A strip shown to the two players in an open trade, so neither is left wondering.
+function tradeNote(s, ctx) {
+  const t = s.trade;
+  if (!t) return '';
+  const from = player(s, t.from), to = player(s, t.to);
+  const kind = (t.round || 1) > 1 ? 'counter offer' : 'offer';
+  if (ctx.controls(t.from)) {
+    return `<div class="trade-note">${face(to.char, { cls: 'bob' })}<span>Your ${kind} to <b>${esc(to.name)}</b> is waiting for an answer.</span>
+      <button class="btn small" data-act="trade-view">View</button><button class="btn small danger" data-act="cancel-trade" data-by="${from.id}">Withdraw</button></div>`;
+  }
+  if (ctx.controls(t.to)) {
+    return `<div class="trade-note in">${face(from.char, { cls: 'bob' })}<span><b>${esc(from.name)}</b> sent you a ${kind}.</span>
+      <button class="btn small primary" data-act="trade-view">Review</button></div>`;
+  }
+  return '';
+}
+
 export function renderCentre(el, s, ctx) {
   const v = turnView(s, ctx);
-  el.innerHTML = `<div class="turn-line">${face(v.who.char, { mood: v.mood, cls: 'bob' })}<span>${v.title}</span></div>
+  el.innerHTML = `${tradeNote(s, ctx)}<div class="turn-line">${face(v.who.char, { mood: v.mood, cls: 'bob' })}<span>${v.title}</span></div>
     <p class="prompt">${v.prompt}</p><div class="acts">${v.acts}</div>`;
 }
 
 export function renderDock(el, s, ctx) {
   const v = turnView(s, ctx);
-  el.innerHTML = `<div class="dock-head">${face(v.who.char, { mood: v.mood, cls: 'bob' })}<div><b>${v.title}</b><p>${v.prompt}</p></div></div>
+  el.innerHTML = `${tradeNote(s, ctx)}<div class="dock-head">${face(v.who.char, { mood: v.mood, cls: 'bob' })}<div><b>${v.title}</b><p>${v.prompt}</p></div></div>
     ${v.acts ? `<div class="acts">${v.acts}</div>` : ''}`;
 }
 
@@ -448,20 +465,23 @@ export function tradeHTML(s, fromId, toId, draft) {
   };
   const cards = (owner, side) => owner.jailCards.length
     ? `<label class="cash-in">Pardons <input type="number" inputmode="numeric" min="0" max="${owner.jailCards.length}" value="${draft[side].cards || 0}" data-cards="${side}"></label>` : '';
-  return `<div class="sheet"><div class="sheet-head plain"><h2>Propose a trade</h2></div><div class="pad">
-    <div class="trade-who">${others.map((p) => `<button class="who${p.id === them.id ? ' on' : ''}" data-trade-to="${p.id}">${face(p.char)}<span>${esc(p.name)}</span></button>`).join('')}</div>
+  const counter = !!draft.counter;
+  return `<div class="sheet"><div class="sheet-head plain"><h2>${counter ? `Counter ${esc(them.name)}'s offer` : 'Propose a trade'}</h2></div><div class="pad">
+    ${counter ? `<p class="muted">Change the terms, then send it back. ${esc(them.name)} can accept, decline or counter again.</p>` : ''}
+    <div class="trade-who"${counter ? ' hidden' : ''}>${others.map((p) => `<button class="who${p.id === them.id ? ' on' : ''}" data-trade-to="${p.id}">${face(p.char)}<span>${esc(p.name)}</span></button>`).join('')}</div>
     <div class="trade-cols">
       <div class="trade-col"><h4>${face(me.char)}${esc(me.name)} gives</h4><div class="trade-list">${list(me, 'give')}</div>
         <label class="cash-in">Gold <input type="number" inputmode="numeric" min="0" max="${me.cash}" step="10" value="${draft.give.cash || 0}" data-cash="give"></label>${cards(me, 'give')}</div>
       <div class="trade-col"><h4>${face(them.char)}${esc(them.name)} gives</h4><div class="trade-list">${list(them, 'get')}</div>
         <label class="cash-in">Gold <input type="number" inputmode="numeric" min="0" max="${them.cash}" step="10" value="${draft.get.cash || 0}" data-cash="get"></label>${cards(them, 'get')}</div>
     </div></div>
-    <div class="sheet-actions"><button class="btn ink primary" data-act="propose" data-by="${fromId}" data-to="${them.id}">Send offer</button><button class="btn ink" data-act="close">Cancel</button></div></div>`;
+    <div class="sheet-actions"><button class="btn ink primary" data-act="propose" data-by="${fromId}" data-to="${them.id}">${counter ? 'Send counter offer' : 'Send offer'}</button><button class="btn ink" data-act="${counter ? 'trade-view' : 'close'}">${counter ? 'Back to their offer' : 'Cancel'}</button></div></div>`;
 }
 
-export function tradeReviewHTML(s) {
+export function tradeReviewHTML(s, viewer) {
   const t = s.trade;
   const a = player(s, t.from), b = player(s, t.to);
+  if (viewer === t.from) return tradeSentHTML(s, a, b, t);
   const side = (x) => {
     const items = [...x.tiles.map((i) => `<span class="sw" style="background:${tileColor(TILES[i])}"></span>${esc(TILES[i].name)}${s.own[i] && s.own[i].mort ? ' (pledged)' : ''}`)];
     if (x.cash) items.push(`${coin}${x.cash} gold`);
@@ -469,11 +489,25 @@ export function tradeReviewHTML(s) {
     return items.length ? `<ul class="offer">${items.map((i) => `<li>${i}</li>`).join('')}</ul>` : '<p class="muted">Nothing</p>';
   };
   return `<div class="sheet"><div class="sheet-head char-head" style="--c:${CHARACTERS[a.char].color}">
-      <div class="char-hero small">${portrait(a.char, 'happy')}</div><div><div class="grp">Trade offer</div><h2>${esc(a.name)} proposes a deal</h2></div></div>
+      <div class="char-hero small">${portrait(a.char, 'happy')}</div><div><div class="grp">${(t.round || 1) > 1 ? `Counter offer, round ${t.round}` : 'Trade offer'}</div><h2>${esc(a.name)} ${(t.round || 1) > 1 ? 'counters your offer' : 'proposes a deal'}</h2></div></div>
     <div class="pad trade-sum">
     <p><b>${esc(b.name)}, you receive:</b></p>${side(t.give)}
     <p><b>You give:</b></p>${side(t.get)}</div>
-    <div class="sheet-actions"><button class="btn ink primary" data-act="accept-trade" data-by="${b.id}">Accept</button><button class="btn ink" data-act="reject-trade" data-by="${b.id}">Decline</button></div></div>`;
+    <div class="sheet-actions"><button class="btn ink primary" data-act="accept-trade" data-by="${b.id}">Accept</button><button class="btn ink" data-act="counter-trade" data-by="${b.id}">Counter offer</button><button class="btn ink danger-ink" data-act="reject-trade" data-by="${b.id}">Decline</button><button class="btn ink" data-act="close">Decide later</button></div></div>`;
+}
+
+function tradeSentHTML(s, a, b, t) {
+  const items = (x) => {
+    const list = [...x.tiles.map((i) => `<span class="sw" style="background:${tileColor(TILES[i])}"></span>${esc(TILES[i].name)}`)];
+    if (x.cash) list.push(`${coin}${x.cash} gold`);
+    if (x.cards) list.push(`${x.cards} pardon card${x.cards > 1 ? 's' : ''}`);
+    return list.length ? `<ul class="offer">${list.map((i) => `<li>${i}</li>`).join('')}</ul>` : '<p class="muted">Nothing</p>';
+  };
+  return `<div class="sheet"><div class="sheet-head char-head" style="--c:${CHARACTERS[b.char].color}">
+      <div class="char-hero small">${portrait(b.char, 'idle')}</div><div><div class="grp">Waiting for an answer</div><h2>Your offer to ${esc(b.name)}</h2></div></div>
+    <div class="pad trade-sum"><p class="waiting-dots">${esc(b.name)} is considering it<span>.</span><span>.</span><span>.</span></p>
+    <p><b>You give:</b></p>${items(t.give)}<p><b>You receive:</b></p>${items(t.get)}</div>
+    <div class="sheet-actions"><button class="btn ink danger-ink" data-act="cancel-trade" data-by="${a.id}">Withdraw offer</button><button class="btn ink primary" data-act="close">Close</button></div></div>`;
 }
 
 export function rulesHTML() {
@@ -493,6 +527,8 @@ export function rulesHTML() {
     <h3>Divine powers</h3>
     <ul>${CHARACTER_IDS.map((id) => `<li><b>${CHARACTERS[id].name}, ${esc(CHARACTERS[id].power)}:</b> ${esc(CHARACTERS[id].powerText)}</li>`).join('')}</ul>
     <p class="muted">Each power works once per game, on your turn before you roll.</p>
+    <h3>Trades</h3>
+    <ul><li>Offer realms, gold and pardons to any player at any time. They can accept, decline, or send back a counter offer with different terms. Both of you see how it went.</li></ul>
     <h3>Stories</h3>
     <ul><li>Tap any tile to see a sketch of the place and read its story from the epic.</li></ul>
     <h3>Debts</h3>
@@ -541,7 +577,8 @@ export function homeArt() {
     const c = CHARACTERS[id];
     return `<g class="ring-med" style="animation-delay:${0.2 + k * 0.1}s">
       <circle cx="${x}" cy="${y}" r="47" fill="#E9C46A"/><circle cx="${x}" cy="${y}" r="44" fill="${c.color}"/>
-      <svg class="portrait" x="${x - 44}" y="${y - 44}" width="88" height="88" viewBox="14 3 72 72" style="--blink:-${k * 0.8}s">${portrait(id, 'idle').replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg>
+      <clipPath id="ring-clip-${id}"><circle cx="${x}" cy="${y}" r="44"/></clipPath>
+      <image href="${portraitSrc(id, true)}" x="${x - 44}" y="${y - 44}" width="88" height="88" clip-path="url(#ring-clip-${id})" preserveAspectRatio="xMidYMid slice"/>
       <text x="${x}" y="${y + 66}" text-anchor="middle" class="ring-name">${c.name}</text></g>`;
   }).join('');
   const art = centreArt().replace(/<\/svg>\s*$/, '');

@@ -13,7 +13,7 @@ It is designed for every screen: a two-column table on desktops, a stacked layou
 
 ## Made to feel like a game
 
-- **Comic characters**: each character is drawn as an expressive comic portrait that blinks, bobs and reacts: happy when claiming land, sad when paying rent, shocked when sent into exile.
+- **Divine characters**: each character has a painted, semi-realistic anime portrait. Portraits breathe, catch a sweep of divine light, and react with layered effects: sparkles when claiming land, a blue rain when paying rent, comic shock lines when sent into exile.
 - **Comic panels**: rent, exile, full sets, cards, trades and victories pop up as comic panels with speech bubbles in each character's voice and bold sound-effect bursts.
 - **Motion**: tokens hop tile by tile, the Sudarshana chakra spins as the dice tumble, gold floats up from players as it changes hands, owner seals stamp onto claimed land, temples rise, and lotus petals fall when someone completes a set or wins.
 - **Stories**: tap any tile to see a pencil-and-wash sketch of the place drawn in front of you, and read the story from the epic of why it matters.
@@ -40,7 +40,7 @@ Each player takes on a character with one divine power, usable once per game bef
 - 4 Tirthas (river crossings) and 2 divine treasures (Akshaya Patra and Kamadhenu).
 - Corners: Hastinapura (collect 200 when passing), Vanavas (exile), Kurukshetra (rest) and the Dyuta Sabha (the rigged dice game that sends you into exile).
 - Hold a full colour group to double its rent and build temples evenly; four temples become a palace.
-- Unwanted landings go to auction. Players can trade realms, gold and pardon cards at any time.
+- Unwanted landings go to auction. Players can trade realms, gold and pardon cards at any time. The other player can accept, decline or send back a **counter offer**, and both sides are told how it went. Computer players counter low offers too.
 
 The full rules are in the game under "How to play".
 
@@ -68,6 +68,10 @@ TURN servers are offered by providers such as Metered and Cloudflare, or you can
 - Players can join voice from the lobby or during the game. Everyone in voice connects directly to everyone else (a small mesh, fine for up to 6 players).
 - Mute and leave buttons sit in the top bar; a green glow shows who is speaking, and a mic badge shows who is in voice.
 - Voice needs microphone permission and a secure page (https), which GitHub Pages provides.
+
+## Art credits
+
+Character portraits were generated with the FLUX.1-schnell model (Apache 2.0 licence, free for commercial use, no watermark) through AI Horde, a free community image network. The source files are in `assets/chars`. Board art, sketches and icons are hand-built SVG.
 
 ## Run locally
 
@@ -108,7 +112,7 @@ js/bot.js         computer players
 js/net.js         WebRTC networking (PeerJS + Google STUN)
 js/settings.js    TURN settings, invite sharing, connection test
 js/voice.js       voice chat mesh
-js/characters.js  comic character portraits and their lines
+js/characters.js  character portraits and their lines
 js/comic.js       comic panels, banners, floating gold, confetti
 js/places.js      stories and sketch scenes for every place
 js/sketch.js      pencil-and-wash sketch renderer

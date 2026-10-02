@@ -114,7 +114,14 @@ export function botAction(s, id) {
     const gainsSet = t.give.tiles.some((i) => completesFor(s, id, i));
     const gain = t.give.cash + t.give.tiles.reduce((a, i) => a + tileValue(s, id, i), 0) + t.give.cards * 50;
     const loss = t.get.cash + t.get.tiles.reduce((a, i) => a + tileValue(s, id, i) * (!gainsSet && completesFor(s, t.from, i) ? 2.2 : 1), 0) + t.get.cards * 50;
-    return { type: gain >= loss * 1.15 && p.cash - t.get.cash >= 0 ? 'ACCEPT_TRADE' : 'REJECT_TRADE' };
+    if (gain >= loss * 1.15 && p.cash - t.get.cash >= 0) return { type: 'ACCEPT_TRADE' };
+    // Too low? Ask for more gold once or twice before walking away.
+    const from = player(s, t.from);
+    const more = Math.ceil((loss * 1.2 - gain) / 10) * 10;
+    if ((t.round || 1) < 3 && t.get.tiles.length && !t.get.cash && from && from.cash >= t.give.cash + more) {
+      return { type: 'COUNTER_TRADE', give: t.get, get: { ...t.give, cash: t.give.cash + more } };
+    }
+    return { type: 'REJECT_TRADE' };
   }
 
   // Withdraw our own offer if nobody has answered it for a full round.
