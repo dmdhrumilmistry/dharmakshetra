@@ -13,11 +13,16 @@ It is designed for every screen: a two-column table on desktops, a stacked layou
 
 ## Made to feel like a game
 
-- **Divine characters**: each character has a painted, semi-realistic anime portrait. Portraits breathe, catch a sweep of divine light, and react with layered effects: sparkles when claiming land, a blue rain when paying rent, comic shock lines when sent into exile.
+- **A hand-painted world**: a summer sky with drifting clouds, rolling hills and floating motes of light, cream paper panels with inked comic outlines, halftone dots and comic lettering, and a river valley with a hill temple at the heart of the board.
+- **One tap to play**: Quick play starts you against two computer rivals straight from the start screen. Pick a character from the showcase, or use Custom game for friends on one device.
+- **Progress and badges**: earn XP for claiming realms, completing sets, building, collecting rent and finishing games. Level up through the ranks from Shishya to Chakravartin and unlock 15 badges, all kept on your device. The standings screen shows what you earned, with a one-tap rematch.
+- **A friendly guide**: on your first games, your character explains each new moment (rolling, claiming, auctions, building, debts) once. Tips can be switched off in the menu.
+- **Divine characters**: each character has a comic-inked anime portrait set against a painted summer sky. Portraits breathe, catch a sweep of divine light, and react with layered effects: sparkles when claiming land, a blue rain when paying rent, comic shock lines when sent into exile.
 - **Comic panels**: rent, exile, full sets, cards, trades and victories pop up as comic panels with speech bubbles in each character's voice and bold sound-effect bursts.
-- **Motion**: tokens hop tile by tile, the Sudarshana chakra spins as the dice tumble, gold floats up from players as it changes hands, owner seals stamp onto claimed land, temples rise, and lotus petals fall when someone completes a set or wins.
+- **Motion**: 3D dice tumble and settle, tokens hop tile by tile with a puff of dust, gold floats up as it changes hands, owner seals stamp onto claimed land, temples rise, and petals fall when someone completes a set or wins. A Build button appears when you can raise temples.
+- **Your pace**: choose Relaxed, Normal or Fast game speed from the menu. Reduced-motion settings are respected.
 - **Stories**: tap any tile to see a pencil-and-wash sketch of the place drawn in front of you, and read the story from the epic of why it matters.
-- Synthesised sounds and, on phones, light haptic feedback.
+- Synthesised sounds, optional ambient music (a tanpura drone with a bamboo flute in raga Bhupali) and, on phones, light haptic feedback.
 
 ## The characters
 

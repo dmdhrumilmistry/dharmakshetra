@@ -9,7 +9,12 @@ import { Voice } from './voice.js';
 import { Comic } from './comic.js';
 import { loadNet, saveNet, rtcConfig, encodeTurn, decodeTurn, setSharedTurn, testIce } from './settings.js';
 import * as UI from './ui.js';
-import { play, soundOn, setSound } from './sound.js';
+import { play, soundOn, setSound, startMusic, stopMusic, musicOn } from './sound.js';
+import { sky } from './scenery.js';
+import { pref, setPref, pace } from './prefs.js';
+import { newRun, track, finish, levelOf } from './progress.js';
+import { tipFor, markSeen, resetTips } from './coach.js';
+import { badgeIcon } from './art.js';
 
 const $ = (sel) => document.querySelector(sel);
 const randomId = () => Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 16);
@@ -39,7 +44,7 @@ const app = {
   peers: new Map(), // host only: peer key -> clientId
   voice: null,
   voiceRoster: new Map(), // host only: peerId -> { peerId, seatId, muted }
-  ui: { krishnaPick: false, modal: null, seenTrade: null, lastRoll: -1, fxSeq: -1, prev: null, draft: null, boardBuilt: false, unread: 0, cash: {} },
+  ui: { krishnaPick: false, modal: null, seenTrade: null, lastRoll: -1, fxSeq: -1, prev: null, draft: null, boardBuilt: false, unread: 0, cash: {}, run: null, reward: null, tip: null },
   display: {},
 };
 
@@ -70,15 +75,18 @@ function openModal(html, kind = 'info', arg = null, { wide = false, sticky = fal
   modalEl.hidden = false;
   modalEl.dataset.kind = kind;
   app.ui.modal = { kind, arg, sticky };
+  hideCoach();
   if (!matchMedia('(pointer: coarse)').matches) {
     const focusable = modalBox.querySelector('input:not([type=checkbox]), select, .btn.primary, .btn');
     if (focusable) focusable.focus({ preventScroll: true });
   }
 }
 function closeModal() {
+  const was = app.ui.modal;
   modalEl.hidden = true;
   modalBox.innerHTML = '';
   app.ui.modal = null;
+  if (was && app.state && app.screen === 'game') updateCoach(app.state);
 }
 modalEl.querySelector('.modal-back').addEventListener('click', () => {
   if (!app.ui.modal || !app.ui.modal.sticky) closeModal();
@@ -128,27 +136,51 @@ function ctx() {
 function renderHome() {
   $('#home-name').value = profile.name;
   $('#home-chars').innerHTML = CHARACTER_IDS.map((id) => `
-    <button class="char-opt" role="radio" aria-checked="${id === profile.char}" data-char="${id}">
+    <button class="char-opt" role="radio" aria-checked="${id === profile.char}" data-char="${id}" style="--c:${CHARACTERS[id].color}">
       ${UI.face(id)}<span>${CHARACTERS[id].name}</span></button>`).join('');
   $('#home-hero').innerHTML = UI.heroCard(profile.char);
+  renderProfile();
   const save = loadSave();
   $('#btn-resume').hidden = !save;
-  if (save) $('#btn-resume').textContent = `Resume your saved ${save.mode === 'host' ? 'online ' : ''}game (round ${save.state.round})`;
+  if (save) $('#btn-resume').innerHTML = `<span class="btn-ico">${UI.uiIcon('play')}</span><span class="btn-txt"><b>Continue</b><small>Your saved ${save.mode === 'host' ? 'online ' : ''}game, round ${save.state.round}</small></span>`;
+}
+
+function renderProfile() {
+  $('#home-profile').innerHTML = UI.profileChip(profile.name || CHARACTERS[profile.char].name, profile.char);
+  const chip = $('#xp-chip');
+  if (chip) chip.innerHTML = UI.xpChip();
+}
+
+function selectChar(id) {
+  profile.char = id;
+  saveProfile();
+  renderHome();
+  play('chime');
 }
 
 $('#home-name').addEventListener('input', (e) => {
   profile.name = e.target.value.slice(0, 16);
   saveProfile();
+  renderProfile();
 });
 $('#home-chars').addEventListener('click', (e) => {
   const b = e.target.closest('[data-char]');
   if (!b) return;
-  profile.char = b.dataset.char;
-  saveProfile();
-  renderHome();
-  play('chime');
+  selectChar(b.dataset.char);
   $(`[data-char="${profile.char}"]`).focus();
 });
+$('#home-chars').addEventListener('keydown', (e) => {
+  const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+  if (!step) return;
+  e.preventDefault();
+  stepChar(step);
+  $(`[data-char="${profile.char}"]`).focus();
+});
+function stepChar(step) {
+  const k = CHARACTER_IDS.indexOf(profile.char);
+  selectChar(CHARACTER_IDS[(k + step + CHARACTER_IDS.length) % CHARACTER_IDS.length]);
+}
+$('#btn-quick').addEventListener('click', quickPlay);
 $('#btn-local').addEventListener('click', startLocal);
 $('#btn-host').addEventListener('click', startHost);
 $('#join-form').addEventListener('submit', (e) => {
@@ -183,6 +215,16 @@ function startLocal() {
   addBot();
   show('lobby');
   renderLobby();
+}
+
+// One tap to a game: you and two computer rivals.
+function quickPlay() {
+  resetApp();
+  app.mode = 'local';
+  app.lobby = { seats: [{ id: nextSeatId(), name: myName(), char: profile.char, local: true }] };
+  addBot();
+  addBot();
+  startGame();
 }
 
 function addBot() {
@@ -700,7 +742,11 @@ function enterGame(fromExisting) {
     app.ui.lastRoll = s.rollId;
   }
   app.ui.prev = s;
+  app.ui.run = app.mySeats[0] ? newRun(app.mySeats[0]) : null;
+  app.ui.reward = null;
+  app.ui.tip = null;
   UI.renderDice($('#dice'), s.dice);
+  renderProfile();
   $('#game-chat').hidden = app.mode === 'local';
   $('#top-room').innerHTML = app.mode === 'local' ? '' : `Room <b>${UI.esc(app.code)}</b>`;
   renderSoundBtn();
@@ -750,8 +796,8 @@ function scheduleBots() {
     if (!p.isBot || p.bankrupt) continue;
     const a = botAction(s, p.id);
     if (!a) continue;
-    let delay = a.type === 'BID' || a.type === 'PASS_BID' ? 550 : a.type === 'ROLL' ? 900 : 700;
-    delay += animRemaining() * 150 + Math.min(comic.busy(), 4000);
+    let delay = (a.type === 'BID' || a.type === 'PASS_BID' ? 550 : a.type === 'ROLL' ? 900 : 700) * pace();
+    delay += animRemaining() * hopMs() + Math.min(comic.busy(), 4000);
     botTimer = setTimeout(() => {
       if (app.state !== s) return scheduleBots();
       if (hostApply({ ...a, by: p.id })) botErrors = 0;
@@ -819,7 +865,8 @@ function resetApp() {
     mode: null, code: null, net: null, lobby: { seats: [] }, seatSeq: 0, state: null,
     presence: {}, mySeats: [], chat: [], peers: new Map(), voice: null, voiceRoster: new Map(),
   });
-  Object.assign(app.ui, { krishnaPick: false, seenTrade: null, lastRoll: -1, fxSeq: -1, prev: null, draft: null, lobbyStatus: '', unread: 0, cash: {} });
+  Object.assign(app.ui, { krishnaPick: false, seenTrade: null, lastRoll: -1, fxSeq: -1, prev: null, draft: null, lobbyStatus: '', unread: 0, cash: {}, run: null, reward: null, tip: null });
+  hideCoach();
   setNetStatus(null);
   closeModal();
 }
@@ -836,6 +883,7 @@ function goHome(silent) {
 // ---------- tokens ----------
 
 let animTimer = null;
+const hopMs = () => Math.round(150 * pace());
 function animRemaining() {
   const s = app.state;
   if (!s) return 0;
@@ -879,15 +927,30 @@ function animateTokens() {
     for (const i of landed) {
       const t = document.querySelector(`.tile[data-i="${i}"]`);
       if (t) { t.classList.remove('flash'); void t.offsetWidth; t.classList.add('flash'); }
+      puff(i);
     }
+    if (landed.length) play('land');
     if (hopping.size) {
       play('hop');
-      animTimer = setTimeout(tick, left > 12 ? 70 : 150);
+      animTimer = setTimeout(tick, left > 12 ? Math.round(hopMs() * 0.47) : hopMs());
     } else {
       animTimer = null;
     }
   };
   tick();
+}
+
+// A little puff of dust where a token lands.
+function puff(i) {
+  const layer = $('#tok-layer');
+  if (!layer || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const { x, y } = UI.tileCentre(i);
+  const el = document.createElement('i');
+  el.className = 'puff';
+  el.style.left = `${x}%`;
+  el.style.top = `${y}%`;
+  layer.append(el);
+  setTimeout(() => el.remove(), 700);
 }
 
 // ---------- rendering ----------
@@ -919,20 +982,17 @@ function rollDice(s) {
   ch.classList.remove('spin');
   void ch.offsetWidth;
   ch.classList.add('spin');
+  dice.classList.remove('settle');
   dice.classList.add('rolling');
   play('dice');
   buzz(25);
-  let n = 0;
-  const spin = setInterval(() => {
-    UI.renderDice(dice, [1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)]);
-    if (++n >= 8) {
-      clearInterval(spin);
-      UI.renderDice(dice, s.dice);
-      dice.classList.remove('rolling');
-      dice.classList.add('settle');
-      setTimeout(() => dice.classList.remove('settle'), 400);
-    }
-  }, 70);
+  UI.renderDice(dice, s.dice, true);
+  setTimeout(() => {
+    dice.classList.remove('rolling');
+    dice.classList.add('settle');
+    if (s.dice[0] === s.dice[1]) dice.classList.add('doubles');
+    setTimeout(() => dice.classList.remove('settle', 'doubles'), 900);
+  }, 820);
 }
 
 function refreshPlayers() {
@@ -979,6 +1039,79 @@ function renderGame() {
   handleEffects(s);
   handleTrade(s);
   refreshModal(s, c);
+  if (s.status !== 'playing' && app.ui.run && !app.ui.run.done) {
+    const out = finish(app.ui.run, s);
+    app.ui.reward = { run: app.ui.run };
+    // The standings sheet lists XP and badges; only a level-up gets its own fanfare.
+    if (out.levelUp) setTimeout(() => { renderProfile(); levelUp(out.levelUp); }, (3400 + 1400) * pace());
+    else renderProfile();
+  }
+  updateCoach(s);
+}
+
+// ---------- rewards: XP, badges, levels ----------
+
+function showRewards(out, delay = 0) {
+  if (!out || (!out.xp && !out.badges.length && !out.levelUp)) return;
+  setTimeout(() => {
+    renderProfile();
+    if (out.xp) {
+      const chip = $('#xp-chip');
+      if (chip && app.screen === 'game') {
+        const el = document.createElement('div');
+        el.className = 'xp-pop';
+        el.textContent = `+${out.xp} XP`;
+        const r = chip.getBoundingClientRect();
+        el.style.left = `${r.left + r.width / 2}px`;
+        el.style.top = `${r.bottom + 4}px`;
+        $('#rewards').append(el);
+        chip.classList.remove('glow'); void chip.offsetWidth; chip.classList.add('glow');
+        setTimeout(() => el.remove(), 1600);
+        if (!out.badges.length && !out.levelUp) play('xp');
+      }
+    }
+    out.badges.forEach((b, k) => setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'badge-pop';
+      el.innerHTML = `<div class="bp-ico">${badgeIcon(b.icon)}</div><div><small>Badge unlocked</small><b>${UI.esc(b.name)}</b><span>${UI.esc(b.text)} +50 XP</span></div>`;
+      $('#rewards').append(el);
+      play('badge');
+      setTimeout(() => el.classList.add('out'), 3400);
+      setTimeout(() => el.remove(), 3800);
+    }, k * 1200));
+    if (out.levelUp) setTimeout(() => levelUp(out.levelUp), out.badges.length * 1200);
+  }, delay);
+}
+
+function levelUp(lv) {
+  const el = document.createElement('div');
+  el.className = 'level-up';
+  el.innerHTML = `<div class="lu-rays"></div><div class="lu-card"><small>Level up!</small><span class="lu-num">${lv.level}</span><b>${UI.esc(lv.rank)}</b></div>`;
+  $('#rewards').append(el);
+  play('level');
+  comic.confetti(40);
+  el.addEventListener('click', () => el.remove());
+  setTimeout(() => el.classList.add('out'), 2600);
+  setTimeout(() => el.remove(), 3100);
+}
+
+// ---------- guide tips ----------
+
+function updateCoach(s) {
+  const el = $('#coach');
+  const tip = app.screen === 'game' && !app.ui.modal ? tipFor(s, controls) : null;
+  if (!tip) { if (!app.ui.modal) hideCoach(); return; }
+  if (app.ui.tip === tip.id && !el.hidden) return;
+  app.ui.tip = tip.id;
+  el.innerHTML = `${UI.face(tip.char, { cls: 'bob' })}<div class="coach-body"><b>${UI.esc(tip.title)}</b><p>${UI.esc(tip.text)}</p>
+    <div class="coach-acts"><button class="btn small primary" data-act="tip-ok" data-tip="${tip.id}">Got it</button><button class="link" data-act="tips-off">Hide tips</button></div></div>`;
+  el.hidden = false;
+  el.classList.remove('in'); void el.offsetWidth; el.classList.add('in');
+}
+function hideCoach() {
+  const el = $('#coach');
+  if (el) el.hidden = true;
+  app.ui.tip = null;
 }
 
 function renderFeed(s) {
@@ -996,7 +1129,8 @@ function handleEffects(s) {
   const prev = app.ui.prev;
   app.ui.prev = s;
   if (first || !s.fx || !s.fx.length) return;
-  comic.play(s, prev, s.fx, { delay: animRemaining() * 150 + 120 });
+  comic.play(s, prev, s.fx, { delay: animRemaining() * hopMs() + 120 });
+  if (app.ui.run) showRewards(track(app.ui.run, s, s.fx), animRemaining() * hopMs() + 600);
   for (const f of s.fx) {
     if (f.kind === 'buy' || f.kind === 'auction') play('bell');
     else if (f.kind === 'rent' || f.kind === 'tax') { play('coin'); if (controls(f.player)) buzz([20, 40, 20]); }
@@ -1008,7 +1142,7 @@ function handleEffects(s) {
     else if (f.kind === 'turn' && controls(f.player)) buzz(15);
     else if (f.kind === 'win') {
       play('win');
-      setTimeout(() => openModal(UI.resultsHTML(app.state), 'results'), animRemaining() * 150 + 3400);
+      setTimeout(() => openResults(), animRemaining() * hopMs() + 3400 * pace());
     }
   }
 }
@@ -1019,6 +1153,26 @@ function handleTrade(s) {
     play('chime');
     openModal(UI.tradeReviewHTML(s, s.trade.to), 'trade-review', s.trade.id, { sticky: true });
   }
+}
+
+function openResults() {
+  openModal(UI.resultsHTML(app.state, app.ui.reward, { rematch: app.mode === 'local' && app.lobby.seats.length >= 2 }), 'results');
+  // Fill the XP bar after the sheet has appeared.
+  requestAnimationFrame(() => setTimeout(() => {
+    modalBox.querySelectorAll('[data-fill]').forEach((el) => { el.style.width = `${el.dataset.fill}%`; });
+  }, 250));
+}
+
+// Same table, fresh board.
+function rematch() {
+  if (app.mode !== 'local' || app.lobby.seats.length < 2) return;
+  closeModal();
+  comic.clear();
+  clearTimeout(botTimer);
+  clearTimeout(animTimer);
+  animTimer = null;
+  Object.assign(app.ui, { krishnaPick: false, seenTrade: null, lastRoll: -1, fxSeq: -1, prev: null, draft: null, cash: {} });
+  startGame();
 }
 
 function openTradeView() {
@@ -1197,7 +1351,7 @@ document.addEventListener('click', async (e) => {
   const tileArg = b.dataset.tile !== undefined ? Number(b.dataset.tile) : undefined;
   switch (b.dataset.act) {
     case 'close': closeModal(); break;
-    case 'roll': send('ROLL', by); break;
+    case 'roll': markSeen('roll'); if (app.ui.tip === 'roll') hideCoach(); send('ROLL', by); break;
     case 'end': send('END_TURN', by); break;
     case 'buy': send('BUY', by); break;
     case 'decline': send('DECLINE', by); break;
@@ -1250,7 +1404,23 @@ document.addEventListener('click', async (e) => {
     case 'counter-trade': openCounter(); break;
     case 'trade-view': openTradeView(); break;
     case 'replace-bot': closeModal(); hostApply({ type: 'REPLACE_WITH_BOT', host: true, target: b.dataset.target }); break;
-    case 'results': openModal(UI.resultsHTML(app.state), 'results'); break;
+    case 'results': openResults(); break;
+    case 'rematch': rematch(); break;
+    case 'trophies': play('card'); openModal(UI.trophiesHTML(profile.name || CHARACTERS[profile.char].name, profile.char), 'trophies', null, { wide: true }); break;
+    case 'hero-step': stepChar(Number(b.dataset.step)); break;
+    case 'toggle-sound': toggleSound(); break;
+    case 'toggle-music': toggleMusic(); break;
+    case 'tip-ok': markSeen(b.dataset.tip); hideCoach(); play('tap'); if (app.state) updateCoach(app.state); break;
+    case 'tips-off': setPref('tips', false); hideCoach(); toast('Tips are off. Turn them back on from the menu.'); break;
+    case 'speed': setPref('speed', b.dataset.speed); document.querySelectorAll('[data-act="speed"]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.speed === pref('speed')))); play('tap'); break;
+    case 'tips-toggle': {
+      const on = !pref('tips');
+      setPref('tips', on);
+      if (on) resetTips();
+      b.setAttribute('aria-pressed', String(on));
+      b.querySelector('b').textContent = on ? 'On' : 'Off';
+      break;
+    }
     case 'home': goHome(); break;
     case 'pick-char': pickChar(b.dataset.seat, b.dataset.char); break;
     case 'rules': openModal(UI.rulesHTML(), 'rules', null, { wide: true }); break;
@@ -1305,16 +1475,32 @@ modalBox.addEventListener('submit', (e) => {
 });
 
 $('#btn-trade').addEventListener('click', openTrade);
-$('#btn-sound').addEventListener('click', () => {
+function toggleSound() {
   setSound(!soundOn());
   renderSoundBtn();
   if (soundOn()) play('chime');
-});
+}
+function toggleMusic() {
+  const on = !pref('music');
+  setPref('music', on);
+  if (on) {
+    if (!soundOn()) { setSound(true); renderSoundBtn(); }
+    startMusic();
+  } else stopMusic();
+  renderSoundBtn();
+}
 function renderSoundBtn() {
-  const b = $('#btn-sound');
-  b.innerHTML = UI.uiIcon(soundOn() ? 'speaker' : 'speakerOff');
-  b.setAttribute('aria-pressed', String(soundOn()));
-  b.title = soundOn() ? 'Sound on' : 'Sound off';
+  document.querySelectorAll('[data-sound-btn]').forEach((b) => {
+    b.innerHTML = UI.uiIcon(soundOn() ? 'speaker' : 'speakerOff');
+    b.setAttribute('aria-pressed', String(soundOn()));
+    b.title = soundOn() ? 'Sound on' : 'Sound off';
+  });
+  document.querySelectorAll('[data-music-btn]').forEach((b) => {
+    const on = soundOn() && pref('music');
+    b.innerHTML = UI.uiIcon(on ? 'music' : 'musicOff');
+    b.setAttribute('aria-pressed', String(on));
+    b.title = on ? 'Music on' : 'Music off';
+  });
 }
 $('#btn-menu').innerHTML = UI.uiIcon('menu');
 document.querySelectorAll('[data-ico]').forEach((el) => { el.innerHTML = UI.uiIcon(el.dataset.ico); });
@@ -1328,6 +1514,8 @@ $('#btn-menu').addEventListener('click', () => {
       : 'The game is saved on this device. Resume it from the start screen.';
   openModal(`<div class="sheet"><div class="sheet-head plain"><h2>Menu</h2></div><div class="pad">
     ${app.mode !== 'local' ? `<p>Room code <b>${UI.esc(app.code)}</b></p>` : ''}
+    <div class="pref-row"><span>Game speed</span><div class="seg">${['relaxed', 'normal', 'fast'].map((k) => `<button class="seg-btn" data-act="speed" data-speed="${k}" aria-pressed="${pref('speed') === k}">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div></div>
+    <div class="pref-row"><span>Guide tips</span><button class="seg-btn solo" data-act="tips-toggle" aria-pressed="${pref('tips')}"><b>${pref('tips') ? 'On' : 'Off'}</b></button></div>
     <p class="muted">${leaveNote}</p></div>
     <div class="sheet-actions menu-actions">
       ${app.mode === 'host' ? '<button class="btn ink" data-act="copy-invite">Copy invite link</button>' : ''}
@@ -1356,7 +1544,10 @@ document.addEventListener('keydown', (e) => {
 // ---------- boot ----------
 
 comic = new Comic($('#comic'), { board: $('#board'), tokenPoint });
-$('.home-art').innerHTML = UI.homeArt();
+$('#sky').innerHTML = sky();
+renderSoundBtn();
+// Browsers only allow audio after a gesture, so music waits for the first tap.
+if (pref('music') && soundOn()) document.addEventListener('pointerdown', () => { if (pref('music') && soundOn()) { startMusic(); renderSoundBtn(); } }, { once: true });
 
 // An invite link may carry the host's TURN servers in its #fragment.
 const hash = new URLSearchParams(location.hash.slice(1));

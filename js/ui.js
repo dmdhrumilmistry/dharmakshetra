@@ -5,8 +5,10 @@ import {
   phase, player, current, tilesOf, rentFor, netWorth, ownsGroup,
   canBuild, canSell, canMortgage, unmortgageCost,
 } from './engine.js';
-import { medallion, tileIcon, icon, coin, chakra, centreArt, uiIcon } from './art.js';
-import { portrait, portraitSrc } from './characters.js';
+import { medallion, tileIcon, icon, coin, chakra, uiIcon, badgeIcon } from './art.js';
+import { centreScene } from './scenery.js';
+import { BADGES, levelOf, stats } from './progress.js';
+import { portrait } from './characters.js';
 import { PLACES } from './places.js';
 import { sketch } from './sketch.js';
 
@@ -65,10 +67,10 @@ function tileHTML(t, i) {
 export function buildBoard(el) {
   el.innerHTML = TILES.map(tileHTML).join('') + `
     <div class="centre">
-      ${centreArt()}
+      ${centreScene()}
       <h2 class="logo">Dharmakshetra</h2>
       <div class="round" id="round"></div>
-      <div class="dice-zone">${chakra()}<div class="dice" id="dice"></div></div>
+      <div class="dice-zone">${chakra()}<div class="dice" id="dice">${cube()}${cube()}</div></div>
       <div class="centre-ui" id="centre-ui"></div>
     </div>
     <div class="tok-layer" id="tok-layer"></div>`;
@@ -149,10 +151,31 @@ export function renderTokens(layer, s, displayPos, hopping, mine) {
 }
 
 const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-export function renderDice(el, dice) {
-  el.innerHTML = dice
-    .map((d) => `<div class="die${d === 1 ? ' red' : ''}" aria-label="Die showing ${d}">${Array.from({ length: 9 }, (_, k) => `<i class="${PIPS[d].includes(k) ? 'on' : ''}"></i>`).join('')}</div>`)
-    .join('');
+const FACES = [[1, 'f1'], [6, 'f6'], [2, 'f2'], [5, 'f5'], [3, 'f3'], [4, 'f4']];
+// Cube rotation that brings each value to the front.
+const ROT = { 1: [0, 0], 6: [0, 180], 2: [0, -90], 5: [0, 90], 3: [-90, 0], 4: [90, 0] };
+function cube() {
+  return `<div class="die"><div class="cube">${FACES.map(([v, cls]) => `<div class="face-d ${cls}${v === 1 ? ' red' : ''}">${Array.from({ length: 9 }, (_, k) => `<i class="${PIPS[v].includes(k) ? 'on' : ''}"></i>`).join('')}</div>`).join('')}</div><div class="die-shadow"></div></div>`;
+}
+
+// Show the dice. With roll, the cubes tumble forward a few turns before settling.
+export function renderDice(el, dice, roll = false) {
+  el.querySelectorAll('.die').forEach((die, k) => {
+    const v = dice[k] || 1;
+    const c = die.querySelector('.cube');
+    const [bx, by] = ROT[v];
+    let rx = bx, ry = by;
+    if (roll) {
+      const turns = (cur) => Math.ceil((Number(cur) || 0) / 360) * 360 + 720;
+      rx = turns(c.dataset.rx) + bx + (k ? 360 : 0);
+      ry = turns(c.dataset.ry) + by;
+    }
+    c.classList.toggle('instant', !roll);
+    c.dataset.rx = rx;
+    c.dataset.ry = ry;
+    c.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+    die.setAttribute('aria-label', `Die showing ${v}`);
+  });
 }
 
 // ---------- turn controls (board centre on large screens, dock on phones) ----------
@@ -241,8 +264,12 @@ function turnView(s, ctx) {
         if (powerUsable(cur)) acts += `<button class="btn power" data-act="power" data-by="${cur.id}" title="${esc(c.powerText)}">${charMed(cur.char, 20)}${esc(c.power)}</button>`;
       }
     } else {
-      prompt = cur.flags && Object.keys(cur.flags).length ? 'Your divine power waits for its moment.' : 'Build, trade, or end your turn.';
-      acts = `<button class="btn primary" data-act="end" data-by="${cur.id}">End turn</button>`;
+      const buildable = tilesOf(s, cur.id).filter((i) => canBuild(s, cur.id, i) && (cur.flags?.freeTemple || cur.cash >= GROUPS[TILES[i].group].house));
+      prompt = buildable.length
+        ? `You can raise temples on <b>${buildable.length}</b> realm${buildable.length > 1 ? 's' : ''}. Temples multiply your rent.`
+        : cur.flags && Object.keys(cur.flags).length ? 'Your divine power waits for its moment.' : 'Trade with a rival, or end your turn.';
+      acts = `<button class="btn primary end-btn" data-act="end" data-by="${cur.id}">End turn</button>`;
+      if (buildable.length) acts += `<button class="btn build-btn" data-act="open-realms">${uiIcon('build')}Build (${buildable.length})</button>`;
     }
   } else {
     prompt = cur.isBot ? `${esc(cur.name)} is thinking...` : ctx.presence[cur.id] === false ? `${esc(cur.name)} has lost connection.` : `Waiting for ${esc(cur.name)}...`;
@@ -292,6 +319,7 @@ function tags(s, p, ctx) {
 }
 
 export function renderPlayers(el, s, ctx) {
+  const top = Math.max(1, ...s.players.map((p) => (p.bankrupt ? 0 : netWorth(s, p.id))));
   el.innerHTML = s.players.map((p, k) => {
     const c = CHARACTERS[p.char];
     const sets = tilesOf(s, p.id).map((i) => `<i style="background:${tileColor(TILES[i])}${s.own[i].mort ? ';opacity:.35' : ''}" title="${esc(TILES[i].name)}"></i>`).join('');
@@ -303,7 +331,8 @@ export function renderPlayers(el, s, ctx) {
       <div><div class="pl-name">${esc(p.name)}${tags(s, p, ctx)}</div>
         <div class="pl-meta">${esc(c.name)}, ${p.bankrupt ? 'left the field' : power}</div>
         <div class="pl-sets">${sets}</div></div>
-      <div class="pl-cash" data-cash="${p.cash}">${p.bankrupt ? '' : gold(p.cash)}</div>${replace}</li>`;
+      <div class="pl-cash" data-cash="${p.cash}">${p.bankrupt ? '' : gold(p.cash)}</div>
+      <div class="race" title="Total worth ${p.bankrupt ? 0 : netWorth(s, p.id)}"><i style="width:${p.bankrupt ? 0 : Math.round((netWorth(s, p.id) / top) * 100)}%;background:${c.color}"></i></div>${replace}</li>`;
   }).join('');
 }
 
@@ -437,15 +466,29 @@ export function placeHTML(s, i, ctx) {
     <div class="sheet-actions">${actions}<button class="btn ink" data-act="close">Close</button></div></div>`;
 }
 
-export function resultsHTML(s) {
+export function resultsHTML(s, reward = null, { rematch = false } = {}) {
   const ranked = s.players.slice().sort((a, b) => (a.bankrupt - b.bankrupt) || netWorth(s, b.id) - netWorth(s, a.id));
   const w = s.winner && player(s, s.winner);
+  const medal = ['gold', 'silver', 'bronze'];
+  let xp = '';
+  if (reward && reward.run) {
+    const lv = levelOf();
+    const items = Object.entries(reward.run.items).sort((a, b) => b[1] - a[1]);
+    xp = `<div class="reward-box">
+      <div class="reward-head"><span class="lvl-badge">${lv.level}</span><div><b>+${reward.run.xp} XP</b><span>${esc(lv.rank)}, level ${lv.level}</span></div></div>
+      <div class="xpbar big"><i data-fill="${lv.pct}"></i></div>
+      <ul class="xp-items">${items.map(([k, v]) => `<li><span>${esc(k)}</span><b>+${v}</b></li>`).join('')}</ul>
+      ${reward.run.badges.length ? `<div class="new-badges"><p>New badges</p>${reward.run.badges.map((b) => `<span class="badge-pill">${badgeIcon(b.icon)}${esc(b.name)}</span>`).join('')}</div>` : ''}
+    </div>`;
+  }
   return `<div class="sheet win">
+    <div class="win-rays" aria-hidden="true"></div>
     ${w ? `<div class="win-hero" style="--c:${CHARACTERS[w.char].color}">${portrait(w.char, 'happy')}</div>` : ''}
-    <h2>${w ? `${esc(w.name)} wins` : 'The war is over'}</h2>
+    <h2>${w ? `${esc(w.name)} wins!` : 'The war is over'}</h2>
     ${w ? `<p class="muted">${esc(CHARACTERS[w.char].name)}, ${esc(CHARACTERS[w.char].title.toLowerCase())}, holds the field of dharma.</p>` : ''}
-    <ol class="standings">${ranked.map((p) => `<li>${face(p.char, { mood: p.bankrupt ? 'sad' : p === w ? 'happy' : 'idle' })}<span>${esc(p.name)}</span><span>${p.bankrupt ? 'fell' : `${netWorth(s, p.id).toLocaleString('en-IN')}`}</span></li>`).join('')}</ol>
-    <div class="sheet-actions" style="justify-content:center"><button class="btn ink primary" data-act="home">Back to the start</button><button class="btn ink" data-act="close">Look at the board</button></div></div>`;
+    <ol class="standings">${ranked.map((p, k) => `<li class="${medal[k] && !p.bankrupt ? medal[k] : ''}">${face(p.char, { mood: p.bankrupt ? 'sad' : p === w ? 'happy' : 'idle' })}<span>${esc(p.name)}</span><span>${p.bankrupt ? 'fell' : `${coin}${netWorth(s, p.id).toLocaleString('en-IN')}`}</span></li>`).join('')}</ol>
+    ${xp}
+    <div class="sheet-actions" style="justify-content:center">${rematch ? '<button class="btn ink primary" data-act="rematch">Play again</button>' : ''}<button class="btn ink${rematch ? '' : ' primary'}" data-act="home">Back to the start</button><button class="btn ink" data-act="close">Look at the board</button></div></div>`;
 }
 
 export function tradeHTML(s, fromId, toId, draft) {
@@ -568,29 +611,50 @@ export function settingsHTML(cfg, { isHost, test }) {
     <div class="sheet-actions"><button class="btn ink primary" data-act="settings-save">Save</button><button class="btn ink" data-act="settings-test">Test connection</button><button class="btn ink" data-act="close">Close</button></div></div>`;
 }
 
-// ---------- home art: characters circling Sudarshana ----------
-
-export function homeArt() {
-  const ring = CHARACTER_IDS.map((id, k) => {
-    const a = (k / CHARACTER_IDS.length) * Math.PI * 2 - Math.PI / 2;
-    const x = 300 + 192 * Math.cos(a), y = 290 + 192 * Math.sin(a);
-    const c = CHARACTERS[id];
-    return `<g class="ring-med" style="animation-delay:${0.2 + k * 0.1}s">
-      <circle cx="${x}" cy="${y}" r="47" fill="#E9C46A"/><circle cx="${x}" cy="${y}" r="44" fill="${c.color}"/>
-      <clipPath id="ring-clip-${id}"><circle cx="${x}" cy="${y}" r="44"/></clipPath>
-      <image href="${portraitSrc(id, true)}" x="${x - 44}" y="${y - 44}" width="88" height="88" clip-path="url(#ring-clip-${id})" preserveAspectRatio="xMidYMid slice"/>
-      <text x="${x}" y="${y + 66}" text-anchor="middle" class="ring-name">${c.name}</text></g>`;
-  }).join('');
-  const art = centreArt().replace(/<\/svg>\s*$/, '');
-  return `${art}${chakra('class="home-chakra" x="195" y="185" width="210" height="210"')}${ring}</svg>`;
-}
-
 export function heroCard(id) {
   const c = CHARACTERS[id];
   return `<div class="hero-card" style="--c:${c.color}">
-    <div class="hero-portrait">${portrait(id, 'happy')}</div>
-    <div class="hero-txt"><b>${esc(c.name)}</b><span>${esc(c.title)}</span>
-      <p>${charMed(id, 22)}<b>${esc(c.power)}:</b> ${esc(c.powerText)}</p></div></div>`;
+    <button class="hero-nav prev" data-act="hero-step" data-step="-1" aria-label="Previous character">${uiIcon('back')}</button>
+    <div class="hero-frame"><div class="hero-portrait">${portrait(id, 'happy')}</div></div>
+    <div class="hero-txt"><span class="hero-title">${esc(c.title)}</span><b>${esc(c.name)}</b>
+      <p class="hero-power">${charMed(id, 26)}<span><b>${esc(c.power)}</b>${esc(c.powerText)}</span></p></div>
+    <button class="hero-nav next" data-act="hero-step" data-step="1" aria-label="Next character">${uiIcon('next')}</button>
+  </div>`;
+}
+
+// ---------- progress ----------
+
+export function profileChip(name, charId) {
+  const lv = levelOf();
+  return `${face(charId)}<span class="pc-txt"><b>${esc(name || 'Traveller')}</b><span>${esc(lv.rank)} · Lv ${lv.level}</span>
+    <span class="xpbar"><i style="width:${lv.pct}%"></i></span></span>
+    <span class="pc-badges">${uiIcon('trophy')}${Object.keys(stats().badges).length}/${BADGES.length}</span>`;
+}
+
+export function xpChip() {
+  const lv = levelOf();
+  return `<span class="lvl-badge">${lv.level}</span><span class="xpbar"><i style="width:${lv.pct}%"></i></span>`;
+}
+
+export function trophiesHTML(name, charId) {
+  const lv = levelOf();
+  const st = stats();
+  const c = CHARACTERS[charId];
+  return `<div class="sheet trophies"><div class="sheet-head char-head" style="--c:${c.color}">
+      <div class="char-hero small">${portrait(charId, 'happy')}</div>
+      <div><div class="grp">${esc(lv.rank)}</div><h2>${esc(name || 'Traveller')}</h2>
+      <div class="xpbar big light"><i style="width:${lv.pct}%"></i></div>
+      <p class="hero-cash">Level ${lv.level} · ${lv.into} / ${lv.need} XP to the next level</p></div></div>
+    <div class="pad">
+      <div class="stat-row"><div><b>${st.games}</b><span>Games</span></div><div><b>${st.wins}</b><span>Wins</span></div><div><b>${st.xp.toLocaleString('en-IN')}</b><span>Total XP</span></div><div><b>${st.chars.length}/8</b><span>Characters</span></div></div>
+      <h3 class="sec">Badges</h3>
+      <div class="badge-grid">${BADGES.map((b) => {
+        const got = st.badges[b.id];
+        return `<div class="bdg${got ? ' got' : ''}" title="${esc(b.text)}">${badgeIcon(b.icon)}<b>${esc(b.name)}</b><span>${esc(b.text)}</span></div>`;
+      }).join('')}</div>
+      <p class="muted">Earn XP by claiming realms, building, collecting rent and finishing games. Every badge is worth 50 XP.</p>
+    </div>
+    <div class="sheet-actions"><button class="btn ink primary" data-act="close">Close</button></div></div>`;
 }
 
 export { uiIcon, portrait };
