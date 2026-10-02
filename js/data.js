@@ -14,7 +14,7 @@ export const GROUPS = {
   red:    { name: 'Western kingdoms', color: '#B8323F', house: 150 },
   yellow: { name: 'Kuru lands', color: '#D9AE2B', house: 150 },
   green:  { name: 'Braj', color: '#3E9B6B', house: 200 },
-  indigo: { name: 'Divine cities', color: '#2B3A8C', house: 200 },
+  indigo: { name: 'Divine cities', color: '#7A6FD8', house: 200 },
 };
 
 const realm = (name, group, price, rent, blurb) => ({ type: 'realm', name, group, price, rent, blurb });
@@ -112,35 +112,35 @@ export const ASHIRVAD = [
 // Each character has one divine power, usable once per game.
 export const CHARACTERS = {
   krishna: {
-    name: 'Krishna', title: 'Keeper of the flute', color: '#2F55B4', emblem: 'feather',
+    name: 'Krishna', title: 'Keeper of the flute', color: '#4D9DE0', emblem: 'feather',
     power: 'Sudarshana', powerText: 'Choose your dice total (2 to 12) instead of rolling.',
   },
   balarama: {
-    name: 'Balarama', title: 'Bearer of the plough', color: '#4F7A8C', emblem: 'plough',
+    name: 'Balarama', title: 'Bearer of the plough', color: '#4FB0A5', emblem: 'plough',
     power: 'Halayudha', powerText: 'Your next temple is built for free.',
   },
   arjuna: {
-    name: 'Arjuna', title: 'Archer of Gandiva', color: '#138A72', emblem: 'bow',
+    name: 'Arjuna', title: 'Archer of Gandiva', color: '#3DAA6E', emblem: 'bow',
     power: 'Gandiva', powerText: 'The next rent you owe is waived.',
   },
   bhima: {
-    name: 'Bhima', title: 'Son of the wind', color: '#8C4A2F', emblem: 'mace',
+    name: 'Bhima', title: 'Son of the wind', color: '#D9773F', emblem: 'mace',
     power: 'Vayu\'s speed', powerText: 'Your next roll moves you double the distance.',
   },
   draupadi: {
-    name: 'Draupadi', title: 'Born of the fire', color: '#C2185B', emblem: 'lotus',
+    name: 'Draupadi', title: 'Born of the fire', color: '#E8618C', emblem: 'lotus',
     power: 'Akshaya Patra', powerText: 'Collect 200 from the bank right away.',
   },
   karna: {
-    name: 'Karna', title: 'Son of Surya', color: '#C98A00', emblem: 'sun',
+    name: 'Karna', title: 'Son of Surya', color: '#F0A92E', emblem: 'sun',
     power: 'Kavacha', powerText: 'Your next tax or card payment to the bank is waived.',
   },
   bhishma: {
-    name: 'Bhishma', title: 'Keeper of the vow', color: '#6D5BA8', emblem: 'conch',
+    name: 'Bhishma', title: 'Keeper of the vow', color: '#9B7FD6', emblem: 'conch',
     power: 'Iccha Mrityu', powerText: 'Walk out of Vanavas now, or ignore the next sentence to it.',
   },
   hanuman: {
-    name: 'Hanuman', title: 'Bannered on Arjuna\'s chariot', color: '#D9531E', emblem: 'mountain',
+    name: 'Hanuman', title: 'Bannered on Arjuna\'s chariot', color: '#E8553A', emblem: 'mountain',
     power: 'Great leap', powerText: 'Leap to the next Tirtha before you roll.',
   },
 };
