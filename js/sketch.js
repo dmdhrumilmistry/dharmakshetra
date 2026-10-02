@@ -1,33 +1,39 @@
-// Pencil-and-wash sketches of each place, composed from hand-drawn motifs.
-// Ink lines draw themselves in when the sketch opens.
+// Painted scenes of each place in a soft, hand-painted animation style:
+// watercolour skies and meadows, solid painted shapes with comic ink outlines.
+// Ink lines draw themselves in when the scene opens.
 
 import { PLACES } from './places.js';
 
 let seq = 0;
 let delay = 0;
+let gid = 'sk';
 
 const ink = (d, w = 1.6) => {
-  delay += 0.035;
-  return `<path class="ink" pathLength="1" d="${d}" stroke-width="${w}" style="animation-delay:${delay.toFixed(2)}s"/>`;
+  delay += 0.025;
+  return `<path class="ink" pathLength="1" d="${d}" fill="none" stroke="#2E2A26" stroke-width="${(w * 1.25).toFixed(2)}" style="animation-delay:${delay.toFixed(2)}s"/>`;
 };
-const wash = (d, color, op = 0.35) => `<path class="wash" d="${d}" fill="${color}" stroke="none" opacity="${op}"/>`;
+// White highlight strokes, for ripples on water.
+const shine = (d, w = 1.4) => `<path d="${d}" fill="none" stroke="#FFFFFF" stroke-width="${w}" stroke-linecap="round" opacity=".8"/>`;
+// A solid painted fill with a soft light from above.
+const wash = (d, color) => `<path class="wash" d="${d}" fill="${color}" stroke="none"/><path class="wash" d="${d}" fill="url(#${gid}-gl)" stroke="none"/>`;
 const at = (x, y, s, body, rot = 0) => `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${s})">${body}</g>`;
 const circ = (cx, cy, r) => `M${cx - r} ${cy} a ${r} ${r} 0 1 0 ${2 * r} 0 a ${r} ${r} 0 1 0 ${-2 * r} 0`;
 const rect = (x, y, w, h) => `M${x} ${y} h${w} v${h} h${-w} Z`;
 
 const M = {
-  ground: () => wash('M0 156 C 60 150, 110 160, 170 154 S 280 150, 320 156 V180 H0 Z', '#C9A46A', 0.3)
-    + ink('M0 156 C 60 150, 110 160, 170 154 S 280 150, 320 156', 1.4)
-    + ink('M30 160 l3 -6 M36 161 l-1 -7 M120 158 l2 -6 M126 159 l-2 -6 M268 158 l3 -6 M300 160 l-1 -6', 1),
-  hills: () => wash('M0 122 C 40 98, 80 98, 120 118 C 150 102, 190 94, 230 114 C 260 102, 300 104, 320 114 V160 H0 Z', '#7BAF7B', 0.25)
+  ground: () => wash('M0 156 C 60 150, 110 160, 170 154 S 280 150, 320 156 V180 H0 Z', '#79B861')
+    + `<path d="M0 166 C 80 160, 160 170, 320 164 V180 H0 Z" fill="#5E9C4E"/>`
+    + `<g stroke="#3F7A3E" stroke-width="1.2" stroke-linecap="round" fill="none">${[18, 52, 96, 134, 188, 226, 262, 300].map((x, k) => `<path d="M${x} ${164 + (k % 2) * 6} q 1 -6 3 -8 M${x + 3} ${164 + (k % 2) * 6} q 0 -5 -3 -7"/>`).join('')}</g>`
+    + `<g>${[40, 112, 176, 244, 288].map((x, k) => `<circle cx="${x}" cy="${168 + (k % 2) * 5}" r="1.8" fill="${k % 2 ? '#F7B6C8' : '#FFF6E0'}"/>`).join('')}</g>`
+    + ink('M0 156 C 60 150, 110 160, 170 154 S 280 150, 320 156', 1.2),
+  hills: () => wash('M0 122 C 40 98, 80 98, 120 118 C 150 102, 190 94, 230 114 C 260 102, 300 104, 320 114 V160 H0 Z', '#8DC27A')
+    + `<g fill="#6EA862">${[[40, 114, 9], [52, 116, 7], [210, 108, 10], [224, 112, 7]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join('')}</g>`
     + ink('M0 122 C 40 98, 80 98, 120 118 C 150 102, 190 94, 230 114 C 260 102, 300 104, 320 114', 1.1),
-  sun: (x, y, r = 14, low = false) => wash(circ(x, y, r + 6), low ? '#E9573F' : '#F2B632', 0.35)
-    + ink(circ(x, y, r), 1.5)
-    + ink(Array.from({ length: 8 }, (_, k) => {
-      const a = (k * Math.PI) / 4;
-      return `M${(x + (r + 4) * Math.cos(a)).toFixed(1)} ${(y + (r + 4) * Math.sin(a)).toFixed(1)} L${(x + (r + 10) * Math.cos(a)).toFixed(1)} ${(y + (r + 10) * Math.sin(a)).toFixed(1)}`;
-    }).join(' '), 1.2),
-  moon: (x, y) => wash(circ(x, y, 18), '#F6E7B0', 0.4) + ink(`M${x + 6} ${y - 15} A 16 16 0 1 0 ${x + 6} ${y + 15} A 12 12 0 1 1 ${x + 6} ${y - 15} Z`, 1.4),
+  sun: (x, y, r = 14, low = false) => `<circle cx="${x}" cy="${y}" r="${r * 3}" fill="url(#${gid}-glow)"/>`
+    + `<circle cx="${x}" cy="${y}" r="${r}" fill="${low ? '#FF9A5C' : '#FFE08A'}"/><circle cx="${x - r * 0.25}" cy="${y - r * 0.25}" r="${r * 0.6}" fill="${low ? '#FFC08A' : '#FFF4C8'}"/>`,
+  moon: (x, y) => `<circle cx="${x}" cy="${y}" r="40" fill="url(#${gid}-glow)"/>`
+    + `<path d="M${x + 6} ${y - 15} A 16 16 0 1 0 ${x + 6} ${y + 15} A 12 12 0 1 1 ${x + 6} ${y - 15} Z" fill="#FFF3C4"/>`
+    + `<g fill="#FFFFFF">${[[-120, -10], [-60, 20], [-160, 30], [30, 40], [-30, -20]].map(([dx, dy]) => `<circle cx="${x + dx}" cy="${y + dy}" r="1.3"/>`).join('')}</g>`,
   palace: (x, y, s = 1) => at(x, y, s, wash('M-60 0 V-40 H60 V0 Z M-24 -40 Q-24 -70 0 -78 Q24 -70 24 -40 Z', '#E9B949', 0.35)
     + ink('M-60 0 V-40 H60 V0 M-66 0 H66 M-70 5 H70')
     + ink('M-24 -40 Q-24 -70 0 -78 Q24 -70 24 -40 M0 -78 V-81 M-3.5 -81 Q0 -88 3.5 -81 Z M0 -86 V-92')
@@ -57,16 +63,18 @@ const M = {
   temple: (x, y, s = 1) => at(x, y, s, wash('M-22 0 V-18 H22 V0 Z M-18 -18 C -18 -40, -8 -58, 0 -64 C 8 -58, 18 -40, 18 -18 Z', '#E8893A', 0.35)
     + ink('M-22 0 V-18 H22 V0 M-26 0 H26 M-6 0 V-10 Q0 -15 6 -10 V0')
     + ink('M-18 -18 C -18 -40, -8 -58, 0 -64 C 8 -58, 18 -40, 18 -18 M-16 -30 H16 M-12 -44 H12 M-6 -64 H6 M0 -64 V-74 M0 -74 L10 -71 L0 -68', 1.4)),
-  river: (y) => wash(`M0 ${y - 4} C 40 ${y - 10}, 80 ${y + 2}, 120 ${y - 4} S 200 ${y - 10}, 240 ${y - 4} S 300 ${y + 2}, 320 ${y - 4} V180 H0 Z`, '#5FA8CC', 0.35)
-    + [0, 12, 24].map((d) => ink(`M0 ${y + d} C 40 ${y + d - 6}, 80 ${y + d + 6}, 120 ${y + d} S 200 ${y + d - 6}, 240 ${y + d} S 300 ${y + d + 6}, 320 ${y + d}`, 1.1)).join(''),
+  river: (y) => `<path d="M0 ${y - 4} C 40 ${y - 10}, 80 ${y + 2}, 120 ${y - 4} S 200 ${y - 10}, 240 ${y - 4} S 300 ${y + 2}, 320 ${y - 4} V180 H0 Z" fill="url(#${gid}-water)"/>`
+    + ink(`M0 ${y - 4} C 40 ${y - 10}, 80 ${y + 2}, 120 ${y - 4} S 200 ${y - 10}, 240 ${y - 4} S 300 ${y + 2}, 320 ${y - 4}`, 1.1)
+    + [8, 20, 32].map((d, k) => shine(`M${20 + k * 30} ${y + d} q 10 -4 20 0 M${150 + k * 20} ${y + d + 3} q 12 -4 24 0 M${250 - k * 10} ${y + d} q 9 -3 18 0`)).join(''),
   lotus: (x, y, s = 1) => at(x, y, s, wash('M0 0 C -10 -4, -18 -12, -20 -20 C -10 -18, -6 -22, 0 -26 C 6 -22, 10 -18, 20 -20 C 18 -12, 10 -4, 0 0 Z', '#E86A8E', 0.45)
     + ink('M0 0 C -6 -8, -6 -18, 0 -26 C 6 -18, 6 -8, 0 0 M0 0 C -10 -4, -18 -12, -20 -20 C -10 -18, -4 -10, 0 0 M0 0 C 10 -4, 18 -12, 20 -20 C 10 -18, 4 -10, 0 0 M-22 4 C -10 8, 10 8, 22 4', 1.3)),
   fishTarget: (x, y, s = 1) => at(x, y, s, ink('M0 60 V16')
     + ink(`${circ(0, 0, 16)} M-16 0 H16 M0 -16 V16 M-11 -11 L11 11 M11 -11 L-11 11`, 1.2)
     + wash('M-14 -24 C -6 -32, 8 -32, 14 -24 C 8 -18, -6 -18, -14 -24 Z', '#5FA8CC', 0.5)
     + ink('M-14 -24 C -6 -32, 8 -32, 14 -24 C 8 -18, -6 -18, -14 -24 Z M14 -24 L22 -30 L22 -18 Z M-8 -25 l0.1 0', 1.3)),
-  pool: (x, y) => wash(`M${x - 62} ${y} C ${x - 62} ${y - 12}, ${x + 62} ${y - 12}, ${x + 62} ${y} C ${x + 62} ${y + 12}, ${x - 62} ${y + 12}, ${x - 62} ${y} Z`, '#5FA8CC', 0.4)
-    + ink(`M${x - 62} ${y} C ${x - 62} ${y - 12}, ${x + 62} ${y - 12}, ${x + 62} ${y} C ${x + 62} ${y + 12}, ${x - 62} ${y + 12}, ${x - 62} ${y} Z M${x - 30} ${y} q 8 -3 16 0 M${x + 10} ${y + 2} q 8 -3 16 0`, 1.2),
+  pool: (x, y) => `<path d="M${x - 62} ${y} C ${x - 62} ${y - 12}, ${x + 62} ${y - 12}, ${x + 62} ${y} C ${x + 62} ${y + 12}, ${x - 62} ${y + 12}, ${x - 62} ${y} Z" fill="url(#${gid}-water)"/>`
+    + ink(`M${x - 62} ${y} C ${x - 62} ${y - 12}, ${x + 62} ${y - 12}, ${x + 62} ${y} C ${x + 62} ${y + 12}, ${x - 62} ${y + 12}, ${x - 62} ${y} Z`, 1.2)
+    + shine(`M${x - 30} ${y} q 8 -3 16 0 M${x + 10} ${y + 2} q 8 -3 16 0`),
   bow: (x, y, s = 1) => at(x, y, s, ink('M-4 -36 C 22 -18, 22 18, -4 36', 2) + ink('M-4 -36 L -4 36', 0.9) + ink('M-26 0 H 26 M20 -5 L27 0 L20 5 M-26 0 l-5 -4 M-26 0 l-5 4', 1.3)),
   cow: (x, y, s = 1) => at(x, y - 12 * s, s, wash('M-26 -10 C -26 -26, 18 -28, 22 -14 C 24 -6, 18 -2, 14 -2 H-20 C -26 -2, -27 -6, -26 -10 Z', '#FBF3E0', 0.9)
     + ink('M-26 -10 C -26 -26, 18 -28, 22 -14 C 24 -6, 18 -2, 14 -2 H-20 C -26 -2, -27 -6, -26 -10 Z')
@@ -109,8 +117,8 @@ const M = {
   pot: (x, y, s = 1) => at(x, y, s, wash('M-26 -38 C -30 -10, -20 0, 0 0 C 20 0, 30 -10, 26 -38 Z', '#B87A14', 0.4)
     + ink('M-26 -38 C -30 -10, -20 0, 0 0 C 20 0, 30 -10, 26 -38 M-30 -40 H30 M-28 -24 H28')
     + wash('M-20 -40 C -14 -56, 14 -56, 20 -40 Z', '#FBF3E0', 0.8) + ink('M-20 -40 C -14 -56, 14 -56, 20 -40', 1.2)),
-  field: () => wash('M0 120 H320 V180 H0 Z', '#C9A46A', 0.3) + ink('M0 120 H320', 1.2)
-    + ink([-140, -80, -30, 20, 70, 130, 200].map((d) => `M${160 + d * 2.2} 180 L ${160 + d * 0.4} 122`).join(' '), 1),
+  field: () => wash('M0 120 H320 V180 H0 Z', '#E6C46A') + ink('M0 120 H320', 1.2)
+    + `<g stroke="#C79A3E" stroke-width="3" opacity=".6">${[-140, -80, -30, 20, 70, 130, 200].map((d) => `<path d="M${160 + d * 2.2} 180 L ${160 + d * 0.4} 122"/>`).join('')}</g>`,
   pillars: () => ink('M20 40 H300 M20 46 H300 M20 160 H300', 1.4)
     + ink([40, 100, 220, 280].map((x) => `M${x} 46 V160 M${x + 10} 46 V160 M${x - 4} 52 H${x + 14} M${x - 4} 154 H${x + 14}`).join(' '), 1.2)
     + ink('M50 46 Q 75 70 100 46 M230 46 Q 255 70 280 46', 1),
@@ -125,11 +133,11 @@ const M = {
     + ink('M-62 -30 C -42 -72, 42 -72, 62 -30 C 30 -36, -30 -36, -62 -30 Z M-30 -50 l 4 -8 l 4 8 M10 -56 l 4 -8 l 4 8 M34 -44 l 3 -6 l 3 6')
     + ink('M0 -32 V 34 M-4 34 H4', 1.6)
     + ink('M-40 30 q 4 -10 8 0 M-24 32 q 4 -10 8 0 M20 32 q 4 -10 8 0 M36 30 q 4 -10 8 0', 1.2)),
-  confluence: () => wash('M0 30 C 80 60, 120 100, 150 180 H190 C 200 100, 260 50, 320 30 V 0 H 300 C 240 30, 190 70, 170 130 C 150 80, 80 30, 0 0 Z', '#5FA8CC', 0.35)
+  confluence: () => `<path d="M0 30 C 80 60, 120 100, 150 180 H190 C 200 100, 260 50, 320 30 V 0 H 300 C 240 30, 190 70, 170 130 C 150 80, 80 30, 0 0 Z" fill="url(#${gid}-water)"/>`
     + ink('M0 30 C 80 60, 120 100, 150 180 M0 0 C 80 30, 150 80, 170 130 M320 30 C 260 50, 200 100, 190 180 M300 0 C 240 30, 190 70, 170 130', 1.2)
     + ink('M150 150 q 8 -4 16 0 M160 120 q 6 -3 12 0', 0.9),
-  sea: (y) => wash(`M0 ${y} H320 V180 H0 Z`, '#2B7FA6', 0.3)
-    + [0, 14, 28].map((d) => ink(Array.from({ length: 9 }, (_, k) => `M${k * 36 + (d % 28 ? 18 : 0)} ${y + d} q 9 -8 18 0 q 6 4 12 0`).join(' '), 1)).join(''),
+  sea: (y) => `<path d="M0 ${y} H320 V180 H0 Z" fill="url(#${gid}-water)"/>` + ink(`M0 ${y} H320`, 1.1)
+    + [8, 20, 32].map((d) => shine(Array.from({ length: 9 }, (_, k) => `M${k * 36 + (d % 24 ? 18 : 0)} ${y + d} q 9 -6 18 0`).join(' '))).join(''),
   boat: (x, y, s = 1) => at(x, y, s, wash('M-24 0 C -16 8, 16 8, 24 0 Z M0 -30 L 18 -8 H0 Z', '#FBF3E0', 0.9) + ink('M-24 0 C -16 8, 16 8, 24 0 Z M0 0 V-30 M0 -30 L 18 -8 H0', 1.3)),
   diya: (x, y, s = 1) => at(x, y, s, wash('M-20 0 C -14 10, 14 10, 20 0 Z', '#B87A14', 0.5)
     + ink('M-20 0 C -14 10, 14 10, 20 0 Z')
@@ -144,23 +152,40 @@ const M = {
     + ink('M-12 0 V-18 Q0 -30 12 -18 V0 M-60 -40 V-56 H-44 V-40 M60 -40 V-56 H44 V-40', 1.3)),
 };
 
+// A puffy cloud with a flat, shaded underside.
+const cloud = (x, y, k) => `<g transform="translate(${x} ${y}) scale(${k})" class="sk-cloud">
+  <g fill="#FFFFFF"><circle cx="14" cy="16" r="10"/><circle cx="28" cy="10" r="13"/><circle cx="44" cy="8" r="15"/><circle cx="58" cy="14" r="11"/><rect x="4" y="14" width="64" height="12" rx="6"/></g>
+  <path d="M8 24 H66" stroke="#DCE8F3" stroke-width="4" stroke-linecap="round"/></g>`;
+
+const SKIES = {
+  day: ['#7DB9E3', '#BFE0F2', '#FFF0D2'],
+  sunset: ['#8FB8E0', '#F7C8A8', '#FFB38A'],
+  dusk: ['#8A93D8', '#D9A6CF', '#FFD3A8'],
+};
+
 export function sketch(index, tint = '#E9C46A') {
   const place = PLACES[index];
   if (!place) return '';
-  const id = `sk${++seq}`;
+  gid = `sk${++seq}`;
   delay = 0;
+  const names = place.scene.map((m) => m[0]);
+  const mode = names.includes('moon') ? 'dusk' : place.scene.some((m) => m[0] === 'sun' && m[4]) ? 'sunset' : 'day';
+  const [top, mid, low] = SKIES[mode];
+  const grounded = names.some((n) => ['ground', 'river', 'sea', 'field', 'confluence', 'pillars'].includes(n));
   const body = place.scene.map(([name, ...args]) => (M[name] ? M[name](...args) : '')).join('');
-  return `<svg class="sketch" viewBox="0 0 320 180" role="img" aria-label="Sketch">
+  return `<svg class="sketch" viewBox="0 0 320 180" role="img" aria-label="${place.why ? 'Painting of the place' : 'Painting'}">
     <defs>
-      <filter id="${id}-r" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="${index + 3}"/><feDisplacementMap in="SourceGraphic" scale="2.4"/></filter>
-      <filter id="${id}-p"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 .45  0 0 0 0 .33  0 0 0 0 .18  0 0 0 .09 0"/></filter>
-      <radialGradient id="${id}-t" cx="50%" cy="38%" r="60%"><stop offset="0" stop-color="${tint}" stop-opacity=".28"/><stop offset="1" stop-color="${tint}" stop-opacity="0"/></radialGradient>
-      <radialGradient id="${id}-v" cx="50%" cy="50%" r="70%"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#5A3A14" stop-opacity=".22"/></radialGradient>
+      <linearGradient id="${gid}-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset=".6" stop-color="${mid}"/><stop offset="1" stop-color="${low}"/></linearGradient>
+      <linearGradient id="${gid}-gl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".38"/><stop offset=".55" stop-color="#FFFFFF" stop-opacity="0"/><stop offset="1" stop-color="#2E2A26" stop-opacity=".12"/></linearGradient>
+      <linearGradient id="${gid}-water" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BFE3F2"/><stop offset="1" stop-color="#4F9FC4"/></linearGradient>
+      <radialGradient id="${gid}-glow"><stop offset="0" stop-color="#FFF6D6" stop-opacity=".95"/><stop offset=".4" stop-color="#FFE8A8" stop-opacity=".45"/><stop offset="1" stop-color="#FFE8A8" stop-opacity="0"/></radialGradient>
+      <radialGradient id="${gid}-t" cx="50%" cy="40%" r="65%"><stop offset="0" stop-color="${tint}" stop-opacity=".18"/><stop offset="1" stop-color="${tint}" stop-opacity="0"/></radialGradient>
     </defs>
-    <rect width="320" height="180" fill="#F6EAD0"/>
-    <rect width="320" height="180" fill="url(#${id}-t)"/>
-    <g filter="url(#${id}-r)" fill="none" stroke="#4A3826" stroke-linecap="round" stroke-linejoin="round">${body}</g>
-    <rect width="320" height="180" filter="url(#${id}-p)"/>
-    <rect width="320" height="180" fill="url(#${id}-v)"/>
+    <rect width="320" height="180" fill="url(#${gid}-sky)"/>
+    <rect width="320" height="180" fill="url(#${gid}-t)"/>
+    ${cloud(18, 18, 0.9)}${cloud(196, 8, 0.7)}${cloud(250, 52, 0.5)}
+    <path d="M0 132 C 50 112, 100 120, 150 108 S 250 100, 320 118 V180 H0 Z" fill="#9CC9B4" opacity=".75"/>
+    ${grounded ? '' : `<path d="M0 150 C 70 140, 150 152, 220 144 S 300 142, 320 146 V180 H0 Z" fill="#86BF6C"/><path d="M0 166 C 90 158, 200 170, 320 162 V180 H0 Z" fill="#6AAA58"/>${[40, 120, 200, 280].map((x, k) => `<circle cx="${x}" cy="${168 + (k % 2) * 4}" r="1.8" fill="${k % 2 ? '#F7B6C8' : '#FFF6E0'}"/>`).join('')}`}
+    <g stroke-linecap="round" stroke-linejoin="round">${body}</g>
   </svg>`;
 }
