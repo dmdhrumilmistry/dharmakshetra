@@ -383,7 +383,18 @@ function makeVoice() {
         hostVoiceBroadcast();
       }
     },
-    onUpdate: () => { renderVoice(); refreshPlayers(); },
+    onUpdate: () => {
+      const n = app.voice.roster.length;
+      if (!app.voice.active && n > (app.ui.voiceN || 0)) {
+        const r = app.voice.roster[app.voice.roster.length - 1];
+        const seats = app.state ? app.state.players : app.lobby.seats;
+        const who = r && seats.find((x) => x.id === r.seatId);
+        if (who && r.seatId !== mySeatId()) { toast(`${who.name} is in voice chat. Tap Voice to talk.`); play('chime'); }
+      }
+      app.ui.voiceN = n;
+      renderVoice();
+      refreshPlayers();
+    },
     onBlocked: (audio) => {
       toast('Tap anywhere to hear voice chat.');
       document.addEventListener('pointerdown', () => audio.play().catch(() => {}), { once: true });
@@ -413,9 +424,9 @@ function renderVoice() {
     if (!online || !v) return;
     if (!v.active) {
       const n = v.roster.length;
-      slot.innerHTML = `<button class="btn small voice-btn" data-act="voice-join">${UI.uiIcon('headset')}<span>Join voice${n ? ` (${n})` : ''}</span></button>`;
+      slot.innerHTML = `<button class="btn small voice-btn join${n ? ' others' : ''}" data-act="voice-join" title="Join voice chat">${UI.uiIcon('headset')}<span><b class="vb-long">Join voice</b><b class="vb-short">Voice</b></span>${n ? `<i class="vb-count">${n}</i>` : ''}</button>`;
     } else {
-      slot.innerHTML = `<button class="btn small voice-btn on${v.muted ? ' muted' : ''}" data-act="voice-mute" aria-pressed="${v.muted}" title="${v.muted ? 'Unmute' : 'Mute'}">${UI.uiIcon(v.muted ? 'micOff' : 'mic')}<span>${v.muted ? 'Muted' : `Live${v.connectedCount() ? ` (${v.connectedCount() + 1})` : ''}`}</span></button>
+      slot.innerHTML = `<button class="btn small voice-btn on${v.muted ? ' muted' : ''}" data-act="voice-mute" aria-pressed="${v.muted}" title="${v.muted ? 'Unmute' : 'Mute'}"><i class="live-dot"></i>${UI.uiIcon(v.muted ? 'micOff' : 'mic')}<span>${v.muted ? 'Muted' : `Live${v.connectedCount() ? ` (${v.connectedCount() + 1})` : ''}`}</span></button>
         <button class="btn small icon-btn danger" data-act="voice-leave" aria-label="Leave voice" title="Leave voice">${UI.uiIcon('hangup')}</button>`;
     }
   });
@@ -1495,6 +1506,8 @@ function renderSoundBtn() {
     b.setAttribute('aria-pressed', String(soundOn()));
     b.title = soundOn() ? 'Sound on' : 'Sound off';
   });
+  document.querySelectorAll('[data-sound-pref]').forEach((b) => { b.setAttribute('aria-pressed', String(soundOn())); b.innerHTML = `<b>${soundOn() ? 'On' : 'Off'}</b>`; });
+  document.querySelectorAll('[data-music-pref]').forEach((b) => { const on = soundOn() && pref('music'); b.setAttribute('aria-pressed', String(on)); b.innerHTML = `<b>${on ? 'On' : 'Off'}</b>`; });
   document.querySelectorAll('[data-music-btn]').forEach((b) => {
     const on = soundOn() && pref('music');
     b.innerHTML = UI.uiIcon(on ? 'music' : 'musicOff');
@@ -1515,6 +1528,8 @@ $('#btn-menu').addEventListener('click', () => {
   openModal(`<div class="sheet"><div class="sheet-head plain"><h2>Menu</h2></div><div class="pad">
     ${app.mode !== 'local' ? `<p>Room code <b>${UI.esc(app.code)}</b></p>` : ''}
     <div class="pref-row"><span>Game speed</span><div class="seg">${['relaxed', 'normal', 'fast'].map((k) => `<button class="seg-btn" data-act="speed" data-speed="${k}" aria-pressed="${pref('speed') === k}">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div></div>
+    <div class="pref-row"><span>Sound</span><button class="seg-btn solo" data-act="toggle-sound" data-sound-pref aria-pressed="${soundOn()}"><b>${soundOn() ? 'On' : 'Off'}</b></button></div>
+    <div class="pref-row"><span>Music</span><button class="seg-btn solo" data-act="toggle-music" data-music-pref aria-pressed="${soundOn() && pref('music')}"><b>${soundOn() && pref('music') ? 'On' : 'Off'}</b></button></div>
     <div class="pref-row"><span>Guide tips</span><button class="seg-btn solo" data-act="tips-toggle" aria-pressed="${pref('tips')}"><b>${pref('tips') ? 'On' : 'Off'}</b></button></div>
     <p class="muted">${leaveNote}</p></div>
     <div class="sheet-actions menu-actions">
