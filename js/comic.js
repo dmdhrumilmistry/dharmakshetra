@@ -4,6 +4,7 @@
 import { TILES, GROUPS, CHARACTERS } from './data.js';
 import { portrait, line } from './characters.js';
 import { icon } from './art.js';
+import { pace } from './prefs.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -23,7 +24,7 @@ export class Comic {
   busy() {
     const now = Date.now();
     const cur = Math.max(0, this.endsAt - now);
-    return cur + this.queue.reduce((a, p) => a + p.ms, 0);
+    return cur + this.queue.reduce((a, p) => a + p.ms * pace(), 0);
   }
 
   clear() {
@@ -98,7 +99,8 @@ export class Comic {
     const p = this.queue.shift();
     if (!p) { this.current = null; return; }
     this.current = p;
-    this.endsAt = Date.now() + p.ms;
+    const ms = p.ms * pace();
+    this.endsAt = Date.now() + ms;
     const el = document.createElement('div');
     el.className = `comic-panel k-${p.kind.split(' ').join(' k-')}`;
     el.style.setProperty('--c', p.color);
@@ -107,7 +109,9 @@ export class Comic {
         <div class="cp-face">${portrait(ch, mood)}</div>
         ${say ? `<div class="bubble">${esc(say)}</div>` : ''}
       </div>`).join('');
+    const happy = /buy|set|win|power|mini/.test(p.kind);
     el.innerHTML = `
+      <div class="cp-fx ${happy ? 'sparkle' : 'speed'}" aria-hidden="true"></div>
       <div class="cp-burst"><span>${esc(p.burst)}</span></div>
       ${p.card ? `<div class="cp-card">${icon(p.kind.includes('leela') ? 'flute' : 'diya')}<p>${esc(p.card)}</p></div>` : ''}
       <div class="cp-cast">${cast}</div>
@@ -117,7 +121,7 @@ export class Comic {
     this.layer.append(el);
     this.onPanel(p);
     if (p.confetti && !reduced()) this.confetti(p.confetti);
-    el._timer = setTimeout(() => this._dismiss(el), p.ms);
+    el._timer = setTimeout(() => this._dismiss(el), ms);
   }
 
   _dismiss(el) {
@@ -148,7 +152,8 @@ export class Comic {
     el.style.top = `${Math.max(8, r.top + r.height * 0.14)}px`;
     el.style.left = `${r.left + r.width / 2}px`;
     this.layer.append(el);
-    setTimeout(() => el.remove(), reduced() ? 1200 : 1900);
+    setTimeout(() => el.remove(), reduced() ? 1200 : 1900 * Math.max(0.8, pace()));
+    el.style.animationDuration = `${1.9 * Math.max(0.8, pace())}s`;
   }
 
   floats(s, prev) {
@@ -169,7 +174,7 @@ export class Comic {
   }
 
   confetti(n = 60) {
-    const colors = ['#E86A8E', '#F4A7BB', '#E9C46A', '#FBF3E0', '#1FA38D'];
+    const colors = ['#F7B6C8', '#EE87A3', '#FFD98A', '#FFFDF6', '#9AD3B5', '#BFE0F2'];
     for (let k = 0; k < n; k++) {
       const el = document.createElement('i');
       el.className = 'petal';
