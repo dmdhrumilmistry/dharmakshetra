@@ -21,7 +21,7 @@ It is designed for every screen: a two-column table on desktops, a stacked layou
 - **Comic panels**: rent, exile, full sets, cards, trades and victories pop up as comic panels with speech bubbles in each character's voice and bold sound-effect bursts.
 - **Motion**: 3D dice tumble and settle, tokens hop tile by tile with a puff of dust, gold floats up as it changes hands, owner seals stamp onto claimed land, temples rise, and petals fall when someone completes a set or wins. A Build button appears when you can raise temples.
 - **Your pace**: choose Relaxed, Normal or Fast game speed from the menu. Reduced-motion settings are respected.
-- **Stories**: tap any tile to see a pencil-and-wash sketch of the place drawn in front of you, and read the story from the epic of why it matters.
+- **Stories**: tap any tile to see a painted scene of the place, with its ink outlines drawing in, and read the story from the epic of why it matters.
 - Synthesised sounds, optional ambient music (a tanpura drone with a bamboo flute in raga Bhupali) and, on phones, light haptic feedback.
 
 ## The characters
